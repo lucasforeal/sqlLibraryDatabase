@@ -1,0 +1,42 @@
+! Example of a testing file.   THESE ARE FAR FROM SUFFICIENT TESTS!  
+! STUDENTS: BE SURE THE FILE YOU TURN IN TESTS EVERYTHING
+! STUDENTS: PUT YOUR NAME(S) HERE
+!
+! Delete pre-existing data
+#
+! Examples of add tests
+! Two copies of the same book, one category, one borrower
+AK AA.00 "LEGITIMATE BOOK" { AARDVARK ZEBRA } HC { ORIGINAL WORDS }
+AK AA.00
+AC PEON 14 100
+AR 1234 AARDVARK ANTHONY { 123-4567 X1234 } PEON
+! Example of an illegal add - a book with spaces in a keyword
+AK AB.00 "SPACES IN KEYWORD" { } HC { "SPACE IN KW" }
+! Examples of checkout, renewal requests
+C 1234 AA.00 1
+C 1234 AA.00 2
+W AA.00 1
+! Example of date modification and returning a book late
++ 30
+R AA.00 2
+! Examples of fine tests. 
+G 1234
+! Change date on next line to be 14 days after date test is run
+F 1234 "LEGITIMATE BOOK" 2023-01-01
+G 1234
+! Examples of edit tests
+EK AA.00 "EDITED LEGITIMATE BOOK" { NEWAUTHOR AARDVARK } SC { WORDS EDITED }
+EC PEON 5 2
+ER 1234 ZEBRA ZELDA { X1234 987-6543 } PEON
+! Examples of reports
+PB
+Pb
+PK
+PC
+PR
+PF
+PO
+! Examples of delete tests - copy 1 of book, category and borrower deleted
+DK AA.00 1
+DR 1234
+DC PEON

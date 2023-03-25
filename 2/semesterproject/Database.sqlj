@@ -1,0 +1,1469 @@
+/*
+ * file: Database.sqlj
+ *
+ * Originally written by Russell C. Bjork
+ * Modified for CS352 Project by:
+ *
+ */
+ 
+package semesterproject;
+
+import semesterproject.gui.ErrorMessage;
+import java.io.PrintStream;
+import java.util.Calendar;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.sql.*;
+import java.math.BigDecimal;
+import sqlj.runtime.*;
+import sqlj.runtime.ref.*;
+
+/**
+ * This class manages access to the database for the CS352 Library project
+ */
+
+public class Database
+{
+    /** Constructor
+     *
+     */
+    public Database() throws Exception
+    {
+        // Load the db2 driver
+
+        try
+        {
+            Class.forName(DRIVER_NAME).newInstance();
+        }
+        catch(Exception e)
+        {
+            System.err.println("Error loading db2 driver " + e);
+            if (e instanceof SQLException)
+                System.err.println("Code: " + ((SQLException) e).getErrorCode()
+                    + "State: " + ((SQLException) e).getSQLState());
+            throw e;
+        }
+    }
+
+    /* *************************************************************************
+     * THE FOLLOWING METHODS ARE CALLED WHEN VARIOUS OPERATIONS ARE SELECTED
+     * BY THE USER IN THE GUI.
+     * ************************************************************************/
+
+    /** Method used to login to the database - called when user enters a
+     *  username and password and clicks OK.  For testing / evaluation, the
+     *  special username "none" is recognized (and does not need a password). As
+     *  a username, "none" means proceed without establishing a connection to the
+     *  database - usable only for demonstrating the GUI without actually
+     *  accessing the database, of course.
+     *
+     *  @param username the username the user typed
+     *  @param password the password the user typed
+     *
+     *  @exception an ErrorMessage is thrown with an appropriate message if
+     *          the login fails
+     */
+    public void login(String username, char [] password) throws ErrorMessage
+    {
+        connection = null;
+        try
+        {
+            if (! username.equals("none"))
+            {
+                connection = DriverManager.getConnection(DATABASE_URL,
+                                    username, new String(password));
+                DefaultContext context = new DefaultContext(connection);
+                DefaultContext.setDefaultContext(context);
+                connection.setAutoCommit(false);
+        		resetToday();   
+            }
+        }
+        catch(SQLException e)
+        {
+            if (e.getErrorCode() == BAD_PASSWORD_SQL_ERROR)
+                throw new ErrorMessage("Incorrect username and/or password");
+            else
+            {
+                throw new ErrorMessage("Unexpected SQL error: " + e.getMessage() +
+                      "Code: " + e.getErrorCode() + " State: " + e.getSQLState());
+            }
+        }
+        finally
+        {
+            for (int i = 0; i < password.length; i ++)
+                password[i] = 0;
+        }
+    }
+
+	/* ************************************************************************
+	 * Method called to delete all existing entries in the database
+	 * ************************************************************************
+	 
+	 /** Delete all existing entries in the database
+	  */
+	public void startOver() throws ErrorMessage
+	{
+		try
+		{
+			#sql { delete from fine where true };
+			#sql { delete from checked_out where true };
+			#sql { delete from book_keyword where true };
+			#sql { delete from book_author where true };
+			#sql { delete from book where true };
+			#sql { delete from book_info where true };
+			#sql { delete from borrower_phone where true };
+			#sql { delete from borrower where true };
+			#sql { delete from category where true };
+			#sql { commit };
+		}
+        catch(SQLException e)
+        {
+            rollback();
+        	throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
+    }
+
+    /* ************************************************************************
+     * Methods called to perform check-out, check-in, and renewal of books.
+     * ***********************************************************************/
+
+    /** Get the name of a borrower, given his/her ID
+     *
+     *  @param borrowerID the ID of the borrower.
+     *  @return this borrower's name     
+     *
+     *  @exception an ErrorMessage is thrown with an appropriate message if
+     *          the borrower does not exist
+     */
+    public String getBorrowerName(String borrowerID) throws ErrorMessage
+    {
+// STUB
+if (borrowerID.equals("BAD")) throw new ErrorMessage("Error message test getBorrowerName");
+return "??? name ???";
+    }
+
+    /** Check out a book.
+     *
+     *  @param borrowerID the ID of the borrower to whom book is to be checked
+     *         out
+     *  @param callNumber the call number of the book to check out
+     *  @param copyNumber the copy number of the book to check out
+     *  @return the date on which the book will be due
+     *
+     *  @exception an ErrorMessage is thrown with an appropriate message if
+     *          the check out fails
+     */
+    public Date checkOutBook(String borrowerID,
+                             String callNumber,
+                             short copyNumber) throws ErrorMessage
+    {
+// STUB
+if (callNumber.equals("BAD")) throw new ErrorMessage("Error message test checkOutBook");
+System.out.println("Check out " + callNumber + " " +
+copyNumber + " to " + borrowerID);
+Calendar calendar = Calendar.getInstance();
+calendar.add(Calendar.DATE, 10);
+return new Date(calendar.getTime().getTime());
+    }
+
+    /** Return a book.  If an overdue fine is incurred, it will be recorded
+     *  in the database.
+     *
+     *  @param callNumber the call number of the book to return
+     *  @param copyNumber the copy number of the book to return
+     *
+     *  @exception an ErrorMessage is thrown with an appropriate message if
+     *          the return fails.  If a fine is incurred, an ErrorMessage is
+     *          also thrown reporting this fact after the fine is recorded in
+     *          the database
+     */
+    public void returnBook(String callNumber, short copyNumber) throws ErrorMessage
+    {
+// STUB
+if (callNumber.equals("BAD")) throw new ErrorMessage("Error message test returnBook");
+System.out.println("Return " + callNumber + " " + copyNumber);
+// Days late should be calculated from the checkout record in the database -
+// this uses the copyNumber to facilitate testing - a book with a copy number
+// greater than 10 is considered late that many days.
+int daysLate = (copyNumber > 10) ? copyNumber : 0;
+        
+// The following line should be incorporated into your code, to be executed
+// if the book is late (after calculating daysLate in the database, of course),
+// and before inserting a new row into the Fine table.   It uses the symbolic 
+// constant DAILY_FINE_RATE in class Fine - which gives the rate in cents, 
+// whereas the Fine table in the database holds the amount in dollars.
+
+        BigDecimal fineAmount = new BigDecimal(Fine.DAILY_FINE_RATE * .01 * daysLate).
+            setScale(2, BigDecimal.ROUND_HALF_UP);
+
+// Include the following at the very end of your code
+
+        if (daysLate > 0)
+            throw new ErrorMessage("Book is overdue " + daysLate + " days " +
+                "- a fine of $" + fineAmount + " has been assessed");
+    }
+
+    /** Renew a book  If there is any problem, an appropriate error
+     *  message will be displayed before returning to the caller.
+     *
+     *  @param callNumber the call number of the book to renew
+     *  @param copyNumber the copy number of the book to renew
+     *  @return the date on which the book will be due if renewed succssfully
+     *
+     *  @exception an ErrorMessage is thrown with an appropriate message if
+     *          the renewal fails for any reason.  
+     */
+    public Date renewBook(String callNumber, short copyNumber) throws ErrorMessage
+    {
+// STUB
+if (callNumber.equals("BAD")) throw new ErrorMessage("Error message test renewBook");
+System.out.println("Renew " + callNumber + " " + copyNumber);
+Calendar calendar = Calendar.getInstance();
+calendar.add(Calendar.DATE, 10);
+// Days late should be calculated from the checkout record in the database -
+// this uses the copyNumber to facilitate testing - a book with a copy number
+// greater than 10 is considered late that many days.
+int daysLate = (copyNumber > 10) ? copyNumber : 0;
+
+// The following line should be incorporated into your code, to be executed
+// if the book is late (after calculating daysLate in the database, of course),
+
+        if (daysLate > 0)
+        {
+            rollback();
+            throw new ErrorMessage("Book is overdue " + daysLate +
+                " days and cannot be renewed");
+        }
+
+return new Date(calendar.getTime().getTime());
+    }
+
+    /* ************************************************************************
+     * Methods that support adding/editing/deleting entities.  In most cases,
+     * some access to existing information in the database is needed before
+     * the user can be asked for all the information needed for the change.
+     * ***********************************************************************/
+
+    /** Determine whether or not a book with a given call number already exists
+     *
+     *  @param callNumber the call number of a book
+     *  @return true if an entry exists in the database for this call number
+     */
+    public boolean bookExists(String callNumber) throws ErrorMessage
+    {
+        int count = 0;
+        try
+        {
+            #sql { select count(*)
+                    into :count
+                    from Book_info
+                    where call_number = :callNumber
+                 };
+        }
+        catch(SQLException e)
+        {
+            throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
+        finally
+        {
+            rollback();
+        }
+        
+        return count > 0;
+    }
+                    
+    /** Add a new book to the database.
+     *
+     *  @param callNumber the call number of the book to add
+     *  // The remaining parameters are null when adding a new copy of an existing
+     *  // book
+     *  @param title the title of the book
+     *  @param authors the authors of the book (a List whose elements are strings
+     *                 corresponding to the various authors)
+     *  @param format the format of the book
+     *  @param keywords the keywords of the book (a List whose elements are strings
+     *                 corresponding to the various keywords)
+     *  // Note that the copy number and bar code are not passed as
+     *  // parameters.  The copy number will be 1 if there is no existing
+     *  // book of this call number - else 1 more than the highest existing
+     *  // number.  The bar code will be generated automatically
+     *
+     *  @exception an ErrorMessage is thrown with an appropriate message if
+     *          the operation fails.  Any failure results in no changes being
+     *          made to the database
+     */
+    public void addBook(String callNumber, String title, List authors,
+                        String format, List keywords) throws ErrorMessage
+    {
+        try
+        {
+            if (title == null)
+            {
+                // New copy of an existing book
+                
+                #sql { insert into Book(call_number, copy_number)
+                        values (:callNumber,
+                                1 + (select max(copy_number) 
+                                        from Book
+                                        where call_number = :callNumber))
+                     };
+                     
+                #sql { commit };
+            }
+            else
+            {
+                // Totally new book
+                
+                #sql { insert into Book_info
+                        values (:callNumber, :title, :format)
+                     };
+                     
+                Iterator authorIterator = authors.iterator();
+                while (authorIterator.hasNext())
+                {
+                    String author = (String) authorIterator.next();
+                    
+                    #sql { insert into Book_author
+                            values(:callNumber, :author)
+                         };
+                }
+                
+                Iterator keywordIterator = keywords.iterator();
+                while (keywordIterator.hasNext())
+                {
+                    String keyword = (String) keywordIterator.next();
+                
+                    #sql { insert into Book_keyword
+                            values(:callNumber, :keyword)
+                         };
+                }
+                    
+                #sql { insert into Book(call_number, copy_number)
+                        values (:callNumber, 1)
+                     };
+                
+                #sql { commit };
+            }
+        }
+        catch(SQLException e)
+        {
+            rollback();
+            if (e.getErrorCode() == DUPLICATE_KEY_SQL_ERROR)
+            {
+                // A primary key violation cannot occur for the Book table
+                // or for the Book_info table, so it must be for the author
+                // or keyword table
+                if (e.getMessage().indexOf(BOOK_AUTHOR_TABLE_NAME) >= 0)
+                    throw new ErrorMessage("Duplicate author for this book");
+                else
+                    throw new ErrorMessage("Duplicate keyword for this book");
+            }
+            else if (e.getMessage().indexOf(BOOK_INFO_VALID_FORMAT_CONSTRAINT) >= 0)
+                throw new ErrorMessage("Invalid format");
+            else if (e.getMessage().indexOf(BOOK_KEYWORD_VALID_KEYWORD_CONSTRAINT) >= 0)
+                throw new ErrorMessage("A keyword contains a space");
+            else
+                throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
+    }
+
+    /** Get information on an existing book about to be edited
+     *
+     *  @param callNumber the call number of the book
+     *  @return values recorded in the database for this book.  A single
+     *          valued attribute has its value represented as a string; a
+     *          multi-valued attribute has its value represented as a
+     *          List whose elements are strings representing the various values
+     *
+     *  @exception an ErrorMessage is thrown with an appropriate message if
+     *          the book does not exist
+     */
+    #sql iterator BookInfoCursor(String);
+    
+    public Object[] getBookInformation(String callNumber) throws ErrorMessage
+    {
+        List originalAuthors = new ArrayList();
+        List originalKeywords = new ArrayList();
+        Object[] values = new Object[7];
+        values[0] = callNumber;
+        values[1] = "(information applies to all copies of this book)";
+        values[2] = "(information applies to all copies of this book)";
+        try
+        {
+            String title = null, format = null;
+            
+            #sql { select title, format
+                    into :title, :format
+                    from Book_info
+                    where call_number = :callNumber
+                 };
+                 
+            values[3] = title;
+            values[5] = format;
+            
+            BookInfoCursor cursor;
+            
+            #sql cursor = { select author_name
+                                from Book_author
+                                where call_number = :callNumber
+                          };
+                                
+            String author = null;
+            
+            while(true)
+            {
+                #sql { fetch :cursor into :author
+                     };
+                     
+                if (cursor.endFetch()) break;
+                
+                originalAuthors.add(author);
+            }
+            
+            values[4] = originalAuthors;
+                
+            #sql cursor = { select keyword
+                                from Book_keyword
+                                where call_number = :callNumber
+                          };
+                                
+            String keyword = null;
+            
+            while(true)
+            {
+                #sql { fetch :cursor into :keyword
+                     };
+                     
+                if (cursor.endFetch()) break;
+                
+                originalKeywords.add(keyword);
+            }
+            
+            values[6] = originalKeywords;
+        }
+        catch(SQLException e)
+        {
+            if (e.getSQLState().equals(NO_ROW_SQL_STATE))
+                throw new ErrorMessage("No such book");
+            else
+                throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
+        finally
+        {
+            rollback();
+        }
+
+        return values;
+    }
+
+    /** Update stored information about a book
+     *
+     *  @param callNumber the call number of the book
+     *  @param newTitle the new value of the book's title (may be the same as original)
+     *  @param originalAuthors the original list of authors for the book
+     *         This will be a list of Strings, each the name of one author
+     *  @param newAuthors the new list of the book's authors (may be the same as original)
+     *         This will be a list of Strings, each the name of one author
+     *  @param newFormat the new value of the book's format (may be the same as original)
+     *  @param originalKeywords the original list of keywords for the book
+     *         This will be a list of Strings, each the name of one author
+     *  @param newKeywords the new list of the book's keywords (may be the same as original)
+     *         This will be a list of Strings, each one keyword
+     *
+     *  @exception an ErrorMessage is thrown with an appropriate message if
+     *          the operation fails.  Any failure results in no changes being
+     *          made to the database
+     */
+    public void updateBook(String callNumber,
+                           String newTitle,
+                           List originalAuthors,
+                           List newAuthors,
+                           String newFormat,
+                           List originalKeywords,
+                           List newKeywords) throws ErrorMessage
+    {
+        try
+        {
+            #sql { update Book_info
+                        set title = :newTitle, format = :newFormat
+                        where call_number = :callNumber
+                 };
+
+			// Remove old list of authors
+			
+			#sql { delete from Book_author
+							where call_number = :callNumber
+				 };
+            
+            // Insert new list of authors
+                
+            Iterator newAuthorsIterator = newAuthors.iterator();
+
+            while(newAuthorsIterator.hasNext())
+            {
+                String newAuthor = (String) newAuthorsIterator.next();
+				#sql { insert into Book_author
+							values(:callNumber, :newAuthor)
+					 };
+            }
+        
+			// Remove old list of keywords
+			
+			#sql { delete from Book_keyword
+						where call_number = :callNumber
+				 };
+            
+            // Insert new list of keywords
+            
+            Iterator newKeywordsIterator = newKeywords.iterator();
+
+            while(newKeywordsIterator.hasNext())
+            {
+                String newKeyword = (String) newKeywordsIterator.next();
+				#sql { insert into Book_keyword
+							values(:callNumber, :newKeyword)
+					 };
+            }
+            
+            #sql { commit };
+        }
+        catch(SQLException e)
+        {
+            rollback();
+            if (e.getErrorCode() == DUPLICATE_KEY_SQL_ERROR)
+            {
+                if (e.getMessage().indexOf(BOOK_AUTHOR_TABLE_NAME) >= 0)
+                    throw new ErrorMessage("Duplicate author for this book");
+                else
+                    throw new ErrorMessage("Duplicate keyword for this book");
+            }
+            else if (e.getMessage().indexOf(BOOK_INFO_VALID_FORMAT_CONSTRAINT) >= 0)
+                throw new ErrorMessage("Invalid format");
+            else if (e.getMessage().indexOf(BOOK_KEYWORD_VALID_KEYWORD_CONSTRAINT) >= 0)
+                throw new ErrorMessage("A keyword contains a space");
+            else
+                throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
+    }
+
+    /** Get information on an existing book copy about to be deleted
+     *
+     *  @param callNumber the call number of the book
+     *  @param copyNumber the copy number of the book
+     *  @return values recorded in the database for this book.  A single
+     *          valued attribute has its value represented as a string; a
+     *          multi-valued attribute has its value represented as a
+     *          List whose elements are strings representing the various values
+     *
+     *  @exception an ErrorMessage is thrown with an appropriate message if
+     *          the book does not exist
+     */
+    public Object[] getBookCopyInformation(String callNumber, short copyNumber)
+                                                            throws ErrorMessage
+    {
+        List originalAuthors = new ArrayList();
+        List originalKeywords = new ArrayList();
+        Object[] values = new Object[7];
+        values[0] = callNumber;
+        values[1] = "" + copyNumber;
+
+        try
+        {
+            short barCode = 0;
+            String title = null, format = null;
+            
+            #sql { select bar_code, title, format
+                    into :barCode, :title, :format
+                    from Book join Book_info
+                        on Book.call_number = Book_info.call_number
+                    where Book.call_number = :callNumber and
+                          Book.copy_number = :copyNumber
+                 };
+                 
+            values[2] = "" + barCode;
+            values[3] = title;
+            values[5] = format;
+            
+            BookInfoCursor cursor;
+            
+            #sql cursor = { select author_name
+                                from Book_author
+                                where call_number = :callNumber
+                          };
+                                
+            String author = null;
+            
+            while(true)
+            {
+                #sql { fetch :cursor into :author
+                     };
+                     
+                if (cursor.endFetch()) break;
+                
+                originalAuthors.add(author);
+            }
+            
+            values[4] = originalAuthors;
+                
+            #sql cursor = { select keyword
+                                from Book_keyword
+                                where call_number = :callNumber
+                          };
+                                
+            String keyword = null;
+            
+            while(true)
+            {
+                #sql { fetch :cursor into :keyword
+                     };
+                     
+                if (cursor.endFetch()) break;
+                
+                originalKeywords.add(keyword);
+            }
+            
+            values[6] = originalKeywords;
+        }
+        catch(SQLException e)
+        {
+            if (e.getSQLState().equals(NO_ROW_SQL_STATE))
+                throw new ErrorMessage("No such book");
+            else
+                throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
+        finally
+        {
+            rollback();
+        }
+
+        return values;
+    }
+
+    /** Delete a book
+     *
+     *  @param callNumber the call number of the book to delete
+     *  @param copyNumber the copy number of the book to delete
+     *
+     *  @exception an ErrorMessage is thrown with an appropriate message if
+     *          the operation fails.  Any failure results in no changes being
+     *          made to the database
+     */
+    public void deleteBook(String callNumber, short copyNumber) throws ErrorMessage
+    {
+        try
+        {
+            #sql { delete from Book
+                        where call_number = :callNumber and
+                              copy_number = :copyNumber
+                 };
+                 
+            #sql { commit };
+        }
+        catch(SQLException e)
+        {
+            rollback();
+            throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
+    }
+
+    /** Add a new category to the database.
+     *
+     *  @param categoryName the name of the category to add
+     *  @param checkoutPeriod the period borrowers in this category can check
+     *         books out for
+     *  @param maxBooksOut the maximum number of books borrowers in this category
+     *         can have out
+     *
+     *  @exception an ErrorMessage is thrown with an appropriate message if
+     *          the operation fails.  Any failure results in no changes being
+     *          made to the database
+     */
+    public void addCategory(String categoryName,
+                            int checkoutPeriod,
+                            int maxBooksOut) throws ErrorMessage
+    {
+        try
+        {
+            #sql { insert into category
+                        values (:categoryName, :checkoutPeriod, :maxBooksOut)
+                 };
+            #sql { commit };
+        }
+        catch(SQLException e)
+        {
+            rollback();
+            if (e.getErrorCode() == DUPLICATE_KEY_SQL_ERROR)
+                throw new ErrorMessage(
+                    "Category name is the same as an existing category");
+            else
+                throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
+    }
+
+    /** Get information on an existing category about to be edited or deleted
+     *
+     *  @param categoryName the name of the category
+     *  @return values recorded in the database for this category - an array
+     *          of strings.
+     *
+     *  @exception an ErrorMessage is thrown with an appropriate message if
+     *          the category does not exist
+     */
+    public String[] getCategoryInformation(String categoryName) throws ErrorMessage
+    {
+        String [] values = new String[3];
+        values[0] = categoryName;
+        int checkoutPeriod, maxBooksOut;
+        try
+        {
+            #sql {  select checkout_period, max_books_out
+                        into :checkoutPeriod, :maxBooksOut
+                        from category
+                        where category_name = :categoryName
+                 };
+            values[1] = "" + checkoutPeriod;
+            values[2] = "" + maxBooksOut;
+            return values;
+        }
+        catch(SQLException e)
+        {
+            if (e.getSQLState().equals(NO_ROW_SQL_STATE))
+                throw new ErrorMessage("No such category");
+            else
+                throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
+        finally
+        {
+            rollback();
+        }
+    }
+
+    /** Update stored information about a category
+     *
+     *  @param categoryName the name of the category
+     *  @param newCheckoutPeriod the new value of checkoutPeriod (may be the same
+     *         as original)
+     *  @param newMaxBooksOut the new value of maxBooksOut (may be the same as original)
+     *
+     *  @exception an ErrorMessage is thrown with an appropriate message if
+     *          the operation fails.  Any failure results in no changes being
+     *          made to the database
+     */
+    public void updateCategory(String categoryName,
+                               int newCheckoutPeriod,
+                               int newMaxBooksOut) throws ErrorMessage
+    {
+        try
+        {
+            #sql { update category
+                        set checkout_period = :newCheckoutPeriod, 
+                            max_books_out = :newMaxBooksOut
+                        where category_name = :categoryName
+                 };
+            #sql { commit };
+        }
+        catch(SQLException e)
+        {
+            rollback();
+            // Since we found the row when initiating the operation, an error
+            // now is always unexpected
+            throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
+    }
+
+    /** Delete a category
+     *
+     *  @param categoryName the name of the category to delete
+     *
+     *  @exception an ErrorMessage is thrown with an appropriate message if
+     *          the operation fails.  Any failure results in no changes being
+     *          made to the database
+     */
+    public void deleteCategory(String categoryName) throws ErrorMessage
+    {
+        try
+        {
+            #sql { delete from category
+                        where category_name = :categoryName
+                 };
+            #sql { commit };
+        }
+        catch(SQLException e)
+        {
+            rollback();
+            if (e.getMessage().indexOf(BORROWER_CATEGORY_FOREIGN_CONSTRAINT) >= 0)
+                throw new ErrorMessage("There are still borrowers in this category");
+            else
+                throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
+    }
+
+    /** Add a new borrower to the database.
+     *
+     *  @param borrowerID the ID for the borrower
+     *  @param lastName the borrower's last name
+     *  @param firstName the borrower's first name
+     *  @param phones the borrower's phone number(s) - a List of strings, each of
+     *         which represents one phone number
+     *  @param category the name of the category to which the borrower will belong
+     *
+     *  @exception an ErrorMessage is thrown with an appropriate message if
+     *          the operation fails.  Any failure results in no changes being
+     *          made to the database
+     */
+    public void addBorrower(String borrowerID,
+                            String lastName,
+                            String firstName,
+                            List phones,
+                            String category) throws ErrorMessage
+    {
+// STUB
+if (borrowerID.equals("BAD")) throw new ErrorMessage("Error message test addBorrower");
+Object [] newInformation = new Object[5];
+newInformation[0] = borrowerID;
+newInformation[1] = lastName;
+newInformation[2] = firstName;
+newInformation[3] = phones;
+newInformation[4] = category;
+// STUB
+System.out.println("addBorrower(" + toString(newInformation) + ") called");
+    }
+
+    /** Get information on an existing borrower about to be edited or deleted
+     *
+     *  @param borrowerID the borrower ID of the borrower
+     *  @return values recorded in the database for this borrower.  A single
+     *          valued attribute has its value represented as a string; a
+     *          multi-valued attribute has its value represented as a
+     *          List whose elements are strings representing the various values
+     *
+     *  @exception an ErrorMessage is thrown with an appropriate message if
+     *          the borrower does not exist
+     */
+    public Object [] getBorrowerInformation(String borrowerID) throws ErrorMessage
+    {
+        List originalPhones = new ArrayList();
+        Object [] values = new Object[5];
+        values[0] = borrowerID;
+// STUB
+if (borrowerID.equals("BAD")) throw new ErrorMessage("Error message test getBorrowerInformation");
+values[1] = "Aardvark";
+values[2] = "Anthony";
+originalPhones.add("123-4567"); originalPhones.add("555-1212");
+        values[3] = originalPhones;
+values[4] = "Big Cheese";
+        return values;
+    }
+
+    /** Update stored information about a borrower
+     *
+     *  @param borrowerID the borrower ID of the borrower
+     *  @param newLastName the new value of lastName (may be the same as original)
+     *  @param newFirstName the new value of firstName (may be the same as original)
+     *  @param originalPhones the original list of phone numbers for the borrower
+     *         This will be a list of Strings, each one phone number
+     *  @param newPhones the new list of phone numbers (may be the same as old)
+     *         This will be a list of Strings, each one phone number
+     *  @param newCategory the new value of category (may be the same as old)
+     *
+     *  @exception an ErrorMessage is thrown with an appropriate message if
+     *          the operation fails.  Any failure results in no changes being
+     *          made to the database
+     */
+    public void updateBorrower(String borrowerID,
+                               String newLastName,
+                               String newFirstName,
+                               List originalPhones,
+                               List newPhones,
+                               String newCategory) throws ErrorMessage
+    {
+// STUB
+if (borrowerID.equals("BAD2")) throw new ErrorMessage("Error message test updateBorrower");
+Object [] information = new Object[6];
+information[0] = borrowerID;
+information[1] = newLastName;
+information[2] = newFirstName;
+information[3] = originalPhones;
+information[4] = newPhones;
+information[5] = newCategory;
+System.out.println("updateBorrower(" + toString(information) + ") called");
+    }
+
+    /** Delete a borrower
+     *
+     *  @param borrowerID the ID of the borrower to delete
+     *
+     *  @exception an ErrorMessage is thrown with an appropriate message if
+     *          the operation fails.  Any failure results in no changes being
+     *          made to the database
+     */
+    public void deleteBorrower(String borrowerID) throws ErrorMessage
+    {
+// STUB
+Object [] information = new Object[1];
+information[0] = borrowerID;
+System.out.println("deleteBorrower(" + toString(information) + ") called");
+    }
+
+    /* ************************************************************************
+     *  Methods called to manage fines
+     * ***********************************************************************/
+
+    /** Get a list of fines owed by a particular borrower
+     *
+     *  @param borrowerID the borrower whose fines are wanted
+     *  @return a list of Fine objects - one for each fine the borrower owes
+     *
+     *  @exception an ErrorMessage is thrown with an appropriate message if
+     *          there is no such borrower, or the borrower has no fines.
+     */
+
+    #sql iterator FineCursor(String, Date, Date, BigDecimal);
+    
+    public List getFines(String borrowerID) throws ErrorMessage
+    {
+        List result = new ArrayList();
+        
+        try
+        {
+            FineCursor cursor;
+            
+            // The compiler doesn't catch that the fetch below initializes
+            // these variables, so give them default values now to keep the
+            // compiler happy
+
+            String title = null;
+            Date dateDue = null;
+            Date dateReturned = null;
+            BigDecimal amount = null;
+
+            #sql cursor = { select title, date_due, date_returned, amount 
+                                from fine
+                                where borrower_id = :borrowerID
+                                order by date_returned
+                          };
+            
+            while(true)
+            {
+                #sql { fetch :cursor into :title,
+                                          :dateDue,
+                                          :dateReturned,
+                                          :amount
+                     };
+                     
+                if (cursor.endFetch()) break;
+                    
+                Fine fine = new Fine(title, dateDue, dateReturned, amount);
+                                     
+                result.add(fine);
+            }
+            cursor.close();
+        }
+        catch(SQLException e)
+        {
+            throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
+        finally
+        {
+            rollback();
+        }
+    
+        if (result.size() == 0)
+        {
+            // No fines found - either the borrower doesn't exist, or has no fines
+            // The following determines which is the case
+            
+            boolean borrowerExists;
+            
+            String dummy = null;
+            try
+            {
+                #sql { select last_name into :dummy
+                            from borrower 
+                            where borrower_id = : borrowerID };
+                borrowerExists = true;
+            }
+            catch(SQLException e)
+            {
+                // If the above statement failed because no row was found,
+                // this means the borrower doesn't exist
+                
+                if (e.getSQLState().equals(NO_ROW_SQL_STATE))
+                    borrowerExists = false;
+                else
+                    throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+            }
+            finally
+            {
+                rollback();
+            }
+    
+            if (borrowerExists)
+                throw new ErrorMessage("This borrower has no fines");
+            else
+                throw new ErrorMessage("No such borrower");
+        }
+        else
+            return result;
+    }
+
+    /** Record fine as paid.
+     *
+     *  @param borrowerID the ID of the borrower owing the fines
+     *  @param fine the fine to be recorded as paid
+     *
+     *  @exception an ErrorMessage is thrown if there is an unexpected error
+     *             recording the payment of the fine.
+     */
+    public void payFine(String borrowerID, Fine fine) throws ErrorMessage
+    {
+// STUB
+System.out.println("payFine() " + borrowerID + " " + fine.getAmountDue() + " called");
+    }
+
+    /* ************************************************************************
+     * Methods called to produce various kinds of report
+     * ***********************************************************************/
+
+    /** Produce a list of all books - call number, title, author(s), format,
+     *  number of copies owned
+     *
+     *  @param stream the stream to which to print the report
+     *
+     *  @exception an ErrorMessage is thrown if there is an unexpected error
+     *             accessing the database.
+     */
+    
+    #sql iterator BooksReportCursor(String, String, String, String, int);
+
+    public void booksReport(PrintStream stream) throws ErrorMessage
+    {
+        try
+        {
+            BooksReportCursor cursor;
+
+            // Left joins are used to ensure we include Book_info even if there
+            // is no author or copy recorded
+            #sql cursor = { select Book_info.call_number, 
+                                   title,
+                                   author_name,
+                                   format,
+                                   count(copy_number)
+                                from Book_info left join Book_author 
+                                on Book_info.call_number = Book_author.call_number
+                                left join Book 
+                                on Book_info.call_number = Book.call_number
+                                group by Book_info.call_number,
+                                         title,
+                                         author_name,
+                                         format
+                                order by Book_info.call_number 
+                           };
+
+            String [] BOOKS_REPORT_HEADINGS = 
+                { "Call Number", "Title", "Author", "Format", "# copies" };
+            int [] BOOKS_REPORT_COLUMN_WIDTHS =
+                { 22, 52, 22, 4, 5 };
+            boolean [] BOOKS_REPORT_REPEAT_COLUMNS =
+                { true, true, false, true, true };
+                
+            produceReport(stream,
+                          "Book Information Report",
+                          BOOKS_REPORT_HEADINGS,
+                          BOOKS_REPORT_COLUMN_WIDTHS,
+                          BOOKS_REPORT_REPEAT_COLUMNS,
+                          cursor.getResultSet());
+
+            cursor.close();
+            
+        }
+        catch(SQLException e)
+        {
+            throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
+        finally
+        {
+            rollback();
+        }
+    }
+
+    /** Produce a list of all copies of books - bar code, call number,
+     *  copy number and title
+     *
+     *  @param stream the stream to which to print the report
+     *
+     *  @exception an ErrorMessage is thrown if there is an unexpected error
+     *             accessing the database.
+     */
+    public void bookCopiesReport(PrintStream stream) throws ErrorMessage
+    {
+// STUB
+            String [] BOOKS_COPIES_REPORT_HEADINGS = 
+                { "Bar Code", "Call Number", "Copy #", "Title" };
+            int [] BOOKS_COPIES_REPORT_COLUMN_WIDTHS =
+                { 13, 22, 8, 50 };
+            boolean [] BOOKS_COPIES_REPORT_REPEAT_COLUMNS =
+                { false, false, false, false };
+stream.println("Book Copies report");        
+    }
+
+    /** Produce a keywords report - keywords listed in alphabetical order,
+     *  together with the call number and title of each book having that keyword
+     *
+     *  @param stream the stream to which to print the report
+     *
+     *  @exception an ErrorMessage is thrown if there is an unexpected error
+     *             accessing the database.
+     */
+    public void keywordsReport(PrintStream stream) throws ErrorMessage
+    {
+// STUB
+            String [] BOOKS_KEYWORD_REPORT_HEADINGS = 
+                { "Keyword", "Call Number", "Title" };
+            int [] BOOKS_KEYWORD_REPORT_COLUMN_WIDTHS =
+                { 22, 22, 50 };
+            boolean [] BOOKS_KEYWORD_REPORT_REPEAT_COLUMNS =
+                { false, false, false };
+stream.println("Book Keywords report");            
+    }
+
+    /** Produce a list of all categories - name, max books out, checkout period
+     *
+     *  @param stream the stream to which to print the report
+     *
+     *  @exception an ErrorMessage is thrown if there is an unexpected error
+     *             accessing the database.
+     */
+
+    #sql iterator CategoryReportCursor(String, int, int);
+    
+    public void categoriesReport(PrintStream stream) throws ErrorMessage
+    {
+        try
+        {
+            CategoryReportCursor cursor;
+
+            #sql cursor = { select * from category order by category_name };
+
+            String [] CATEGORY_REPORT_HEADINGS = 
+                { "Category Name", "Checkout Period", "Maximum Books Out" };
+            int [] CATEGORY_REPORT_COLUMN_WIDTHS =
+                { 15, 17, 10 };
+        
+            produceReport(stream,
+                          "Categories Report",
+                          CATEGORY_REPORT_HEADINGS,
+                          CATEGORY_REPORT_COLUMN_WIDTHS,
+                          null,
+                          cursor.getResultSet());
+
+            cursor.close();
+            
+        }
+        catch(SQLException e)
+        {
+            throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
+        finally
+        {
+            rollback();
+        }
+    }
+    
+    /** Produce a list of all borrowers - id, name, phone number(s), category
+     *
+     *  @param stream the stream to which to print the report
+     *
+     *  @exception an ErrorMessage is thrown if there is an unexpected error
+     *             accessing the database.
+     */
+    public void borrowersReport(PrintStream stream) throws ErrorMessage
+    {
+// STUB
+            String [] BORROWERS_REPORT_HEADINGS = 
+                { "Borrower ID", "Last Name", "First Name", "Phone #", "Category" };
+            int [] BORROWERS_REPORT_COLUMN_WIDTHS =
+                { 12, 22, 22, 22, 10 };
+            boolean [] BORROWERS_REPORT_REPEAT_COLUMNS =
+                { true, true, true, false, true };
+stream.println("Borrowers report");               
+    }
+
+    /** Produce a list of all fines outstanding - borrower name and
+     *  phone number(s), total of all fines outstanding for this borrower
+     *
+     *  @param stream the stream to which to print the report
+     *
+     *  @exception an ErrorMessage is thrown if there is an unexpected error
+     *             accessing the database.
+     */
+    public void finesReport(PrintStream stream) throws ErrorMessage
+    {
+// STUB
+            String [] FINES_REPORT_HEADINGS = 
+                { "Last Name", "First Name", "Phone #", "Total Fines" };
+            int [] FINES_REPORT_COLUMN_WIDTHS =
+                { 22, 22, 22, 11 };
+            boolean [] FINES_REPORT_REPEAT_COLUMNS =
+                { true, true, false, true };
+stream.println("Fines report");         
+    }
+
+    /** Produce a list of all overdue books - borrower name,
+     *  title(s) of overdue books with due date for each.
+     *
+     *  @param stream the stream to which to print the report
+     *
+     *  @exception an ErrorMessage is thrown if there is an unexpected error
+     *             accessing the database.
+     */
+    public void overdueBooksReport(PrintStream stream) throws ErrorMessage
+    {
+// STUB
+            String [] OVERDUE_BOOKS_REPORT_HEADINGS = 
+                { "Last Name", "First Name", "Title", "Date Due" };
+            int [] OVERDUE_BOOKS_REPORT_COLUMN_WIDTHS =
+                { 22, 22, 52, 10 };
+            boolean [] OVERDUE_BOOKS_REPORT_REPEAT_COLUMNS =
+                { true, true, false, false };            
+stream.println("Overdue Books report");
+    }
+
+    /* ************************************************************************
+     * Utility methods 
+     * ***********************************************************************/
+     
+    /** Roll back a read-only transaction or a failed write transaction
+     *
+     */
+    private void rollback()
+    {
+        try
+        {
+            #sql { rollback };
+        }
+        catch(SQLException e)
+        {
+            System.out.println("Fatal error: SQL Exception " + e.getErrorCode() + 
+                " " + e.getMessage() + " during rollback. ");
+            System.exit(1);
+        }
+    }
+    
+    /** Print a neatly formatted report
+     *
+     *  @param stream the stream to print the report to
+     *  @param heading the overall heading for the report
+     *  @param columnHeaadings the headings for the report's columns
+     *  @param columnWidths the widths for the various columns
+     *  @param repeatColumns for some report formats, certain values need to
+     *         be suppressed for all but their first occurrence if the exact 
+     *         same values occur on successive lines of the report.  This
+     *         array specifies which columns these are.  If _all_ of the
+     *         columns specified contain the exact same values on
+     *         successive lines, the values will be replaced by spaces on all
+     *         but the first line.  This parameter can be null if this feature
+     *         is not used for a certain report
+     *  @param resultSet a SQL result set containing the report's data
+     */
+    private void produceReport(PrintStream stream,
+                               String heading,
+                               String [] columnHeadings,
+                               int [] columnWidths,
+                               boolean [] repeatColumns,
+                               ResultSet resultSet) throws SQLException
+    {
+        stream.println(); stream.println(heading); 
+        for (int i = 0; i < heading.length(); i ++)
+            stream.print('_');
+        stream.println(); stream.println();
+        
+        for (int i = 0; i < columnHeadings.length; i ++)
+            stream.print(pad(columnHeadings[i], columnWidths[i]));
+        stream.println();
+        for (int i = 0; i < columnHeadings.length; i ++)
+        {
+            for (int j = 0; j < columnHeadings[i].length(); j ++)
+                stream.print('_');
+            stream.print(pad("", columnWidths[i] - columnHeadings[i].length()));
+        }
+        stream.println(); stream.println();
+        
+        String [] previousLineValues = new String [columnHeadings.length];
+            
+        while(resultSet.next())
+        {
+            String [] currentLineValues = new String [columnHeadings.length];
+            boolean repeatValuesSame = repeatColumns != null;
+            
+            for (int i = 0; i < currentLineValues.length; i ++)
+            {
+                currentLineValues[i] = resultSet.getString(i + 1);
+                if (repeatValuesSame && repeatColumns[i] &&
+                        ! currentLineValues[i].equals(previousLineValues[i]))
+                    repeatValuesSame = false;
+            }
+            
+            for (int i = 0; i < currentLineValues.length; i ++)
+            {
+                if (repeatValuesSame && repeatColumns[i])
+                    stream.print(pad("", columnWidths[i]));
+                else
+                    stream.print(pad(currentLineValues[i], columnWidths[i]));
+            }
+            
+            stream.println();
+            previousLineValues = currentLineValues;
+        }
+        stream.println(); stream.println();
+    }
+        
+    /** Pad a string with spaces
+     *
+     *  @param input the string to pad.  Can be null - in which case it will
+     *         be converted to an empty string
+     *  @param width the total width to pad it to
+     *  @return the string padded with enough spaces to make the specified width.
+     *          If the string was wider than width to begin with, it is returned
+     *          unchanged
+     */
+    private static String pad(String input, int width)
+    {
+        if (input == null) input = "";
+        StringBuffer result = new StringBuffer(input);
+        while(result.length() < width)
+            result.append(' ');
+        return result.toString();
+    }               
+        
+    /* ************************************************************************
+     * To facilitate testing, the database maintains a variable called today
+     * that can be altered from a menu.  The following methods support this
+     * facility.
+     * THEY ARE ONLY HERE TO SUPPORT THE "DIDDLE WITH DATE" OPTION IN THE
+     * "TEST" MENU.   THEY SHOULD NEVER BE CALLED FROM STUDENT CODE!
+     * ***********************************************************************/
+
+	/** Reset today to the current date
+	 */
+	public void resetToday() throws ErrorMessage
+	{
+		try
+		{
+			// Must use dynamic sql for this because version of sqlj
+			// being used does not support set for global variables
+			connection.createStatement().executeUpdate("set today = current date");
+		}
+        catch(SQLException e)
+        {
+        	throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
+        finally
+        {
+        	rollback();
+        }
+	}
+	
+	/** Adjust the value of today forward a backward
+	 *
+	 *	@param amount the amount to change (forward if >0; backward if < 0)
+	 */
+	public void changeToday(int amount) throws ErrorMessage
+	{
+		try
+		{
+			// Must use dynamic sql for this because version of sqlj
+			// being used does not support set for global variables
+			connection.createStatement().executeUpdate(
+				"set today = today + " + amount);
+		}
+        catch(SQLException e)
+        {
+        	throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
+        finally
+        {
+        	rollback();
+        }
+	}
+	
+	/** Get the current value of today
+	 *
+	 *  @return the current value of today
+	 */
+	public java.sql.Date getToday() throws ErrorMessage
+	{
+		try
+		{
+			java.sql.Date result;
+			#sql { select today into :result from sysibm.sysdummy1 };
+			return result;
+		}
+        catch(SQLException e)
+        {
+        	throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
+        finally
+        {
+        	rollback();
+        }
+	} 
+
+	Connection connection;
+	
+    /* ************************************************************************
+     * Class constants and method
+     * ***********************************************************************/
+
+    // Symbolic names for various SQL Errors
+
+    private static final int BAD_PASSWORD_SQL_ERROR = -1403;
+    private static final String NO_ROW_SQL_STATE = "02000";
+    private static final int DUPLICATE_KEY_SQL_ERROR = -803;
+
+    private static final String BOOK_INFO_VALID_FORMAT_CONSTRAINT = 
+        "~~~ YOU NEED TO FILL THIS IN ~~~";
+    private static final String BOOK_KEYWORD_VALID_KEYWORD_CONSTRAINT = 
+        "~~~ YOU NEED TO FILL THIS IN ~~~";
+    private static final String BORROWER_CATEGORY_FOREIGN_CONSTRAINT =
+        "~~~ YOU NEED TO FILL THIS IN ~~~";
+   
+    private static final String BOOK_AUTHOR_TABLE_NAME = "BOOK_AUTHOR";
+    
+    private static final String DRIVER_NAME = "com.ibm.db2.jcc.DB2Driver";
+    private static final String DATABASE_URL =
+    	"jdbc:db2://localhost:50000/project";
+
+    // For testing purposes only - display an array of values for fields that
+    // are parameters to a method
+
+    private String toString(Object [] information)
+    {
+        String result = "";
+        for (int i = 0; i < information.length; i ++)
+        {
+            if (information[i] instanceof String)
+                result += (String) information[i];
+            else
+            {
+                Iterator iterator = ((List) information[i]).iterator();
+                if (iterator.hasNext())
+                {
+                    String separator = "{ ";
+                    while (iterator.hasNext())
+                    {
+                        result += separator += (String) iterator.next();
+                        separator = ", ";
+                    }
+                    result += " }";
+                }
+                else
+                    result += "{}";
+            }
+            if (i < information.length - 1)
+                result += ", ";
+        }
+        return result;
+    }
+}
