@@ -71,7 +71,7 @@ create trigger last_book_trigger
 	for each row 
 	when ((select count(*) 
 			from book 
-			where call_number = o.call_number) 
+			where call_number = o.call_number)
 		= 0)
 		delete from Book_info
 			where call_number = o.call_number;
