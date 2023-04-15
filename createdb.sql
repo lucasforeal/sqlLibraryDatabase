@@ -4,31 +4,36 @@ create variable today date;
 create variable fine_daily_rate_in_cents integer default 5;
 
 create table Category(
-	category_name char(10) primary key not null,
+	category_name char(10) not null,
 	checkout_period integer not null,
-	max_books_out integer not null
+	max_books_out integer not null,
+	primary key (category_name),
+	constraint CHK_checkout_period check (checkout_period >= 0),
+	constraint CHK_max_books_out check (max_books_out >= 0) 
 );
 
 create table Borrower(
-	borrower_id char(10) primary key not null,
+	borrower_id char(10) not null,
 	last_name char(20) not null,
 	first_name char(20) not null,
-	category_name char(10) references Category(category_name)
-	  on delete cascade not null
+	category_name char(10) not null,
+	primary key (borrower_id),
+	constraint FK_category_name foreign key (category_name) references Category(category_name)
 );
 
 create table Borrower_phone(
-  borrower_id char(10) references Borrower(borrower_id)
-	  on delete cascade not null,
-  phone char(20) not null
+    borrower_id char(10) not null,
+    phone char(20) not null,
+	primary key (borrower_id, phone),
+	foreign key (borrower_id) references Borrower(borrower_id) on delete cascade
 );
 
 create table Book_info(
-	call_number char(20) primary key not null,
+	call_number char(20) not null,
 	title char(50) not null,
-	format char(2)
-		constraint valid_resource_code
-	  check(format in ('HC', 'SC', 'CD', 'MF', 'PE')) not null
+	format char(2) not null,
+	primary key (call_number),
+	constraint CHK_format check (format in ('HC', 'SC', 'CD', 'MF', 'PE'))
 );
 
 -- The code supplied below for bar_code will cause it to be generated
@@ -44,18 +49,18 @@ create table Book(
 );
 
 create table Book_author(
-	call_number char(20) references Book_info(call_number)
-	  on delete cascade not null,
-	author_name char(20) not null 
+	call_number char(20) not null,
+	author_name char(20) not null,
+	primary key (call_number, author_name),
+	foreign key (call_number) references Book_info(call_number) on delete cascade
 );
 
-create table Book_keyword(
-  call_number char(20) references Book_info(call_number)
-	  on delete cascade not null,
-  keyword varchar(20) not null
-		constraint valid_pattern
-    check(SYSIBMADM.regexp_like(keyword, '^[A-Za-z]+(_[A-Za-z]+)*$'))
-		--## Make sure this works, then move not null last
+reate table Book_keyword(
+    call_number char(20) not null,
+    keyword varchar(20) not null,
+	primary key (call_number, keyword),
+	foreign key (call_number) references Book_info(call_number) on delete cascade,
+	constraint CHK_keyword check (keyword not like '% %')
 );
 
 create table Checked_out(
