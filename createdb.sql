@@ -55,7 +55,7 @@ create table Book_author(
 	foreign key (call_number) references Book_info(call_number) on delete cascade
 );
 
-reate table Book_keyword(
+create table Book_keyword(
     call_number char(20) not null,
     keyword varchar(20) not null,
 	primary key (call_number, keyword),
@@ -66,23 +66,21 @@ reate table Book_keyword(
 create table Checked_out(
 	call_number char(20) not null,
 	copy_number smallint not null,
-	borrower_id char(10) references Borrower(borrower_id)
-	  on delete cascade not null,
+	borrower_id char(10) not null,
 	date_due date not null,
 	primary key (call_number, copy_number),
-	foreign key (call_number, copy_number)
-	  references Book(call_number, copy_number)
-		  on delete cascade
+	foreign key (call_number, copy_number) references Book(call_number, copy_number) on delete cascade,
+	foreign key (borrower_id) references Borrower(borrower_id)
 );
 
 create table Fine(
-	borrower_id char(10) references Borrower(borrower_id)
-	  on delete cascade not null,
+	borrower_id char(10) not null,
 	title char(50) not null,
 	date_due date not null,
 	date_returned date not null,
 	amount numeric(10,2) not null,
-	primary key (borrower_id, title, date_due)
+	primary key (borrower_id, title, date_due),
+	foreign key (borrower_id) references Borrower(borrower_id) on delete cascade
 );
 
 -- This trigger will delete all other information on book if last
@@ -109,7 +107,8 @@ create trigger cant_renew_overdue_trigger
 		signal sqlstate '70000'
 		set message_text = 'CANT_RENEW_OVERDUE';
 
--- Code needed to create other triggers should be added here
+
+-- This trigger will assess a fine for an overdue book
 
 create trigger assess_fine
   after update of date_due on Checked_out
@@ -139,18 +138,33 @@ create trigger assess_fine
 	signal sqlstate '700001'
 		set message_text = 'FINE_AGGREGATED';
 
-create trigger checkout_limit
-  before insert on Check_out
-	referencing new as n
-	for each row --forgive the rushed syntax
-	when (select count(*)
-		from Checked_out
-		join Borrower
-		on Checked_out.borrower_id = Borrower.borrower_id
-		join Category on borrower.category_name = category.category_name
-		where Checked_out.borrower_id = n.borrower_id
-		and Category.max_books_out <= (select count(*)
-																	 from checked_out
-																	 where checked_out.borrower_id = n.borrower_id))
-	signal sqlstate '700002'
-		set message_text = 'TOO_MANY_BOOKS_OF_THAT_CATEGORY';
+-- This trigger will prevent an attempt to checkout books exceeding the required limit
+
+create trigger checkout_limit  
+	before insert on Checked_out
+		referencing new as n
+		for each row
+		when ((select count(*)
+				from Checked_out
+				where borrower_id = n.borrower_id)
+			= (select max_books_out
+				from Borrower
+				join Category
+				on Borrower.category_name = Category.category_name
+				where borrower_id = n.borrower_id))
+			signal sqlstate '70002'
+			set message_text = 'TOO_MANY_BOOKS_OF_THAT_CATEGORY';
+
+
+-- This trigger will prevent an attempt to delete a borrower who has books checked out
+
+create trigger cant_delete_borrower_trigger
+	before delete on Borrower
+	referencing old as o
+	for each row
+	when ((select count(*)
+			from Checked_out
+			where borrower_id = o.borrower_id)
+		> 0)
+		signal sqlstate '70001'
+		set message_text = 'CANT_DELETE_BORROWER_WITH_BOOK_CHECKED_OUT';
