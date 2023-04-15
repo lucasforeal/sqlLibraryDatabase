@@ -83,8 +83,7 @@ create table Fine(
 	foreign key (borrower_id) references Borrower(borrower_id) on delete cascade
 );
 
--- This trigger will delete all other information on book if last
--- copy is deleted
+-- This trigger will delete all other information on book if last copy is deleted
 
 create trigger last_book_trigger
 	after delete on Book
@@ -140,7 +139,7 @@ create trigger assess_fine
 
 -- This trigger will prevent an attempt to checkout books exceeding the required limit
 
-create trigger checkout_limit  
+create trigger checkout_limit_trigger  
 	before insert on Checked_out
 		referencing new as n
 		for each row
