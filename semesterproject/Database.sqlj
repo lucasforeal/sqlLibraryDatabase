@@ -926,16 +926,36 @@ return new Date(calendar.getTime().getTime());
                                List newPhones,
                                String newCategory) throws ErrorMessage
     {
-// STUB
-if (borrowerID.equals("BAD2")) throw new ErrorMessage("Error message test updateBorrower");
-Object [] information = new Object[6];
-information[0] = borrowerID;
-information[1] = newLastName;
-information[2] = newFirstName;
-information[3] = originalPhones;
-information[4] = newPhones;
-information[5] = newCategory;
-System.out.println("updateBorrower(" + toString(information) + ") called");
+        try {
+            #sql { update Borrower
+                    set lastName = :newLastName,
+                    firstName = :newFirstName,
+                    category = :newCategory
+                    where borrowerID = :borrowerID
+            };
+
+            // Remove list of old phones
+            #sql { delete from Borrower_phone
+                        where borrowerID = :borrowerID
+                        };
+
+            // Insert new list of phones
+
+            Iterator newPhonesIterator = newPhones.iterator();
+
+            while(newPhonesIterator.hasNext())
+            {
+                String newPhone = (String) newPhonesIterator.next();
+				#sql { insert into Borrower_phone
+							values(:borrowerID, :newPhone)
+					 };
+            }
+
+            #sql { commit };
+        }
+        catch(SQLException e) {
+            rollback();
+        }
     }
 
     /** Delete a borrower
