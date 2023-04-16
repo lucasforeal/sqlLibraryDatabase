@@ -968,10 +968,21 @@ return new Date(calendar.getTime().getTime());
      */
     public void deleteBorrower(String borrowerID) throws ErrorMessage
     {
-// STUB
-Object [] information = new Object[1];
-information[0] = borrowerID;
-System.out.println("deleteBorrower(" + toString(information) + ") called");
+        try
+        {
+            #sql { delete from Borrower
+                        where borrower_id = :borrowerID
+                 };
+
+            #sql { commit };
+        }
+        catch(SQLException e)
+        {
+            rollback();
+            throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
+                
+
     }
 
     /* ************************************************************************
