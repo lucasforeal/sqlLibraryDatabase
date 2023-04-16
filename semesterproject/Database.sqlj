@@ -981,8 +981,6 @@ return new Date(calendar.getTime().getTime());
             rollback();
             throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
         }
-                
-
     }
 
     /* ************************************************************************
@@ -1257,16 +1255,47 @@ stream.println("Book Keywords report");
      *  @exception an ErrorMessage is thrown if there is an unexpected error
      *             accessing the database.
      */
+     #sql iterator BorrowerReportCursor(String, String, String, String, String);
+
     public void borrowersReport(PrintStream stream) throws ErrorMessage
     {
-// STUB
+        try
+        {
+            BorrowerReportCursor cursor;
+
+            #sql cursor = { select Borrower.borrower_id,
+                                last_name,
+                                first_name,
+                                phone,
+                                category_name
+                            from Borrower
+                            left join Borrower_phone
+                            on Borrower.borrower_id = Borrower_phone.borrower_id
+                            order by Borrower.borrower_id
+                        };
+
             String [] BORROWERS_REPORT_HEADINGS = 
                 { "Borrower ID", "Last Name", "First Name", "Phone #", "Category" };
             int [] BORROWERS_REPORT_COLUMN_WIDTHS =
                 { 12, 22, 22, 22, 10 };
             boolean [] BORROWERS_REPORT_REPEAT_COLUMNS =
                 { true, true, true, false, true };
-stream.println("Borrowers report");               
+
+            produceReport(stream,
+                "Categories Report",
+                BORROWERS_REPORT_HEADINGS,
+                BORROWERS_REPORT_COLUMN_WIDTHS,
+                BORROWERS_REPORT_REPEAT_COLUMNS,
+                cursor.getResultSet());
+            
+            cursor.close();
+        }
+        catch (SQLException e) {
+            throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
+        finally {
+            rollback();
+        }            
     }
 
     /** Produce a list of all fines outstanding - borrower name and
