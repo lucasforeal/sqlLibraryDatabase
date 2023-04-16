@@ -109,33 +109,19 @@ create trigger cant_renew_overdue_trigger
 
 -- This trigger will assess a fine for an overdue book
 
-create trigger assess_fine
-  after update of date_due on Checked_out
-	referencing new as n
+create trigger assess_fine_trigger
+	after delete on Checked_out
+	referencing old as o
 	for each row
-  when (n.date_due < today)
-	begin atomic
-		if exists(select 1 
-		          from Fine
-							where Fine.date_due = n.date_due) then
-			update Fine
-			set borrower_id = n.borrower_id,
-				title = n.title,
-				date_due = n.date_due,
-				date_returned = today,
-				amount = days_between(date_due, today) * fine_daily_rate_in_cents
-			where fine.date_due = n.date_due;
-	  else
-		  insert into Fine
-		  values (borrower_id,
-			  title,
-			  date_due,
-			  today,
-			  days_between(date_due, today) * fine_daily_rate_in_cents);
-		end if
-	end
-	signal sqlstate '700001'
-		set message_text = 'FINE_AGGREGATED';
+	when (o.date_due < today)
+		insert into Fine
+		values(o.borrower_id,
+			(select title
+				from Book_info
+				where call_number = o.call_number),
+			o.date_due,
+			today,
+			((days(today) - days(o.date_due)) * fine_daily_rate_in_cents) / 100.0);
 
 -- This trigger will prevent an attempt to checkout books exceeding the required limit
 
