@@ -823,6 +823,23 @@ return new Date(calendar.getTime().getTime());
             #sql { insert into Borrower
                         values (:borrowerID, :lastName, :firstName, :category)
                 };
+
+            // insert phone(s) of borrower
+            Iterator phoneIterator = phones.iterator();
+            while (phoneIterator.hasNext())
+            {
+                String phone = (String) phoneIterator.next();
+
+                #sql { insert into Borrower_phone
+                        values(:borrowerID, :phone)
+                    };
+            }
+
+            #sql { commit };
+        }
+        catch (SQLException e) {
+            rollback();
+        }
     }
 
     /** Get information on an existing borrower about to be edited or deleted
@@ -836,19 +853,55 @@ return new Date(calendar.getTime().getTime());
      *  @exception an ErrorMessage is thrown with an appropriate message if
      *          the borrower does not exist
      */
+     #sql iterator BorrowerInfoCursor(String);
+     
     public Object [] getBorrowerInformation(String borrowerID) throws ErrorMessage
     {
         List originalPhones = new ArrayList();
         Object [] values = new Object[5];
         values[0] = borrowerID;
-// STUB
-if (borrowerID.equals("BAD")) throw new ErrorMessage("Error message test getBorrowerInformation");
-values[1] = "Aardvark";
-values[2] = "Anthony";
-originalPhones.add("123-4567"); originalPhones.add("555-1212");
-        values[3] = originalPhones;
-values[4] = "Big Cheese";
-        return values;
+
+        try {
+            String lastName = null, firstName = null, category = null;
+
+            #sql { select last_name, first_name, category_name
+                        into :lastName, :firstName, :category
+                        from Borrower
+                        where borrower_id = :borrowerID
+                };
+
+                values[1] = lastName;
+                values[2] = firstName;
+                values[3] = category;
+
+                BorrowerInfoCursor cursor;
+
+                #sql cursor = { select phone
+                                from Borrower_phone
+                                where borrower_id = :borrowerID
+                                };
+
+                String phone = null;
+
+                while(true)
+                {
+                    #sql { fetch :cursor into :phone
+                        };
+
+                    if (cursor.endFetch()) break;
+
+                    originalPhones.add(phone);
+                }
+
+                values[3] = originalPhones;
+            }
+            catch (SQLException e) {
+            }
+            finally {
+                rollback();
+            }
+
+            return values;
     }
 
     /** Update stored information about a borrower
