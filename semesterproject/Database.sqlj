@@ -818,16 +818,11 @@ return new Date(calendar.getTime().getTime());
                             List phones,
                             String category) throws ErrorMessage
     {
-// STUB
-if (borrowerID.equals("BAD")) throw new ErrorMessage("Error message test addBorrower");
-Object [] newInformation = new Object[5];
-newInformation[0] = borrowerID;
-newInformation[1] = lastName;
-newInformation[2] = firstName;
-newInformation[3] = phones;
-newInformation[4] = category;
-// STUB
-System.out.println("addBorrower(" + toString(newInformation) + ") called");
+        try {
+            // insert info for borrower
+            #sql { insert into Borrower
+                        values (:borrowerID, :lastName, :firstName, :category)
+                };
     }
 
     /** Get information on an existing borrower about to be edited or deleted
