@@ -42,7 +42,10 @@ DR 1234
 DC PEON
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!STUDENT-MADE TESTS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !                                                                    addBorrower
-AR borrowerID Smith Jack {555-5555 555-5556} Student
+! Add Jack:
+AR 0007 Smith Jack {555-5555 555-5556} Student
+! Look him up:
+PR
 !                                                         getBorrowerInformation
 ! Add a new borrower to the database:
 AR 1234 Smith John {555-1234 555-5678} Student
@@ -82,12 +85,14 @@ PR
 ! Print a report of borrowers after deleting a borrower:
 DR 1234
 PR
+! Create a book to test with
+AK AA.00 "LEGITIMATE BOOK" { AARDVARK ZEBRA } HC { ORIGINAL WORDS }
 ! Print a report of borrowers after checking out a book:
-C 1234 callNumber copyNumber
+C 1234 AA.00 1
 PR
 ! Print a report of borrowers after returning a book:
-R 1234 callNumber copyNumber
+R 1234 AA.00 1
 PR
 ! Print a report of borrowers after renewing a book:
-W 1234 callNumber copyNumber
+W 1234 AA.00 1
 PR
