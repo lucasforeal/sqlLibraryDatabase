@@ -40,3 +40,54 @@ PO
 DK AA.00 1
 DR 1234
 DC PEON
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!STUDENT-MADE TESTS!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!                                                                    addBorrower
+AR borrowerID Smith Jack {555-5555 555-5556} Student
+!                                                         getBorrowerInformation
+! Add a new borrower to the database:
+AR 1234 Smith John {555-1234 555-5678} Student
+! Edit a borrower’s information in the database:
+ER 1234 Smith John {555-1234 555-5678} Faculty
+! Delete a borrower from the database:
+DR 1234
+! Get fine information for a borrower:
+G 1234
+! Pay a fine for a borrower:
+F 1234 "Book Title" 2022-04-17
+!                                                                 updateBorrower
+! Update a borrower’s last name:
+ER 1234 Johnson Jane {555-4321 555-8765} Student
+! Update a borrower’s first name:
+ER 1234 John Jane {555-4321 555-8765} Student
+! Update a borrower’s phones:
+ER 1234 John Jane {555-1111 555-2222} Student
+! Update a borrower’s category:
+ER 1234 John Jane {555-4321 555-8765} Faculty
+!                                                                 deleteBorrower
+! Add aadvark:
+AR 1234 AARDVARK ANTHONY { 123-4567 X1234 } PEON
+! Delete aardvark:
+DR 1234
+! Fail to print data about aardvark:
+PR 1234
+!                                                                 borrowerReport
+! Print a report of borrowers:
+PR
+! Print a report of borrowers after adding a new borrower:
+AR 1234 Smith John {555-1234 555-5678} Student
+PR
+! Print a report of borrowers after editing a borrower’s information:
+ER 1234 Johnson Jane {555-4321 555-8765} Faculty
+PR
+! Print a report of borrowers after deleting a borrower:
+DR 1234
+PR
+! Print a report of borrowers after checking out a book:
+C 1234 callNumber copyNumber
+PR
+! Print a report of borrowers after returning a book:
+R 1234 callNumber copyNumber
+PR
+! Print a report of borrowers after renewing a book:
+W 1234 callNumber copyNumber
+PR
