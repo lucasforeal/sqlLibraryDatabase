@@ -106,7 +106,6 @@ create trigger cant_renew_overdue_trigger
 		signal sqlstate '70000'
 		set message_text = 'CANT_RENEW_OVERDUE';
 
-
 -- This trigger will assess a fine for an overdue book
 
 create trigger assess_fine_trigger
@@ -137,9 +136,8 @@ create trigger checkout_limit_trigger
 				join Category
 				on Borrower.category_name = Category.category_name
 				where borrower_id = n.borrower_id))
-			signal sqlstate '70002'
+			signal sqlstate '70001'
 			set message_text = 'TOO_MANY_BOOKS_OF_THAT_CATEGORY';
-
 
 -- This trigger will prevent an attempt to delete a borrower who has books checked out
 
@@ -151,5 +149,5 @@ create trigger cant_delete_borrower_trigger
 			from Checked_out
 			where borrower_id = o.borrower_id)
 		> 0)
-		signal sqlstate '70001'
+		signal sqlstate '70002'
 		set message_text = 'CANT_DELETE_BORROWER_WITH_BOOK_CHECKED_OUT';

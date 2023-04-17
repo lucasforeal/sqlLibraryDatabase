@@ -40,3 +40,241 @@ PO
 DK AA.00 1
 DR 1234
 DC PEON
+!!!!!!!!!!!!!!!!!!!GENERAL createdb.sql STUDENT-MADE TESTS!!!!!!!!!!!!!!!!!!!!!!
+!    Check constraint (This test attempts to add a book with an invalid checkout
+!      period and should fail due to the check constraint on the checkout_period
+!                                              attribute in the Category table):
+AK AA.00 "INVALID CHECKOUT PERIOD" { } HC { } -1 0
+!     Not null constraint (This test attempts to add a borrower with a null last
+! name and should fail due to the not null constraint on the last_name attribute
+!                                                        in the Borrower table):
+AR 1234
+!    Unique constraint (This test attempts to add a book with a call number that
+! already exists in the database and should fail due to the unique constraint on
+!                             the call_number attribute in the Book_info table):
+AK AA.00 "DUPLICATE BOOK" { } HC { } 14 100
+!           Primary key constraint: (This test attempts to add a borrower with a
+!     borrower_id that already exists in the database and should fail due to the
+!    primary key constraint on the borrower_id attribute in the Borrower table):
+AR 1234 AARDVARK ANTHONY { 123-4567 X1234 } PEON
+!  Foreign key constraint: { 123-4567 X1234 } INVALID (This test attempts to add
+!    a borrower with an invalid category_name and should fail due to the foreign
+!          key constraint on the category_name attribute in the Borrower table):
+AR 1234 AARDVARK ANTHONY
+!!!!!!!!INTEGRITY CONSTRAINT createdb.sql STUDENT-MADE TESTS: Category!!!!!!!!!!
+!                                                               Check constraint
+AC INVALID -1 2
+AC INVALID 2 -1
+!                                                            Not null constraint
+AC
+AC VALID
+!                                                         Primary key constraint
+AC PEON 14 100
+AC PEON 14 100
+!!!!!!!!INTEGRITY CONSTRAINT createdb.sql STUDENT-MADE TESTS: Borrower!!!!!!!!!!
+!                                                            Not null constraint
+AR
+AR 1234
+!                                                         Primary key constraint
+AR 1234 AARDVARK ANTHONY { 123-4567 X1234 } PEON
+AR 1234 AARDVARK ANTHONY { 123-4567 X1234 } PEON
+!                                                         Foreign key constraint
+AR 1234 AARDVARK ANTHONY { 123-4567 X1234 } INVALID
+AR 5678 ZEBRA ZELDA { X5678 987-6543 } INVALID
+!!!!!INTEGRITY CONSTRAINT createdb.sql STUDENT-MADE TESTS: Borrower_phone!!!!!!!
+!                                                            Not null constraint
+AP
+AP 1234
+!                                                         Primary key constraint
+AP 1234 123-4567
+AP 1234 123-4567
+!                                                         Foreign key constraint
+AP INVALID 123-4567
+AP INVALID 987-6543
+!                                                   On delete cascade constraint
+! This test deletes a borrower and should also delete any associated phone
+! numbers due to the on delete cascade constraint on the borrower_id attribute:
+DR 1234
+! This test is identical to Test 1 and also deletes a borrower and any
+! associated phone numbers:
+DR 5678
+!!!!!!!INTEGRITY CONSTRAINT createdb.sql STUDENT-MADE TESTS: Book_info!!!!!!!!!!
+!                                                     Check constraint on format
+AK AA.00 “BOOK” { AUTHOR } XX { KEYWORD }
+AK AB.00 “BOOK” { AUTHOR } HC { KEYWORD }
+!                                             Not null constraint on call_number
+AK “BOOK” { AUTHOR } HC { KEYWORD }
+AK AA.00 “BOOK” { AUTHOR } HC { KEYWORD }
+!                                                   Not null constraint on title
+AK AA.00 { AUTHOR } HC { KEYWORD }
+AK AB.00 “BOOK” { AUTHOR } HC { KEYWORD }
+!                                          Primary key constraint on call_number
+AK AA.00 “BOOK” { AUTHOR } HC { KEYWORD }
+AK AA.00 “ANOTHER BOOK” { AUTHOR } HC { KEYWORD }
+!!!!!!!!!!INTEGRITY CONSTRAINT createdb.sql STUDENT-MADE TESTS: Book!!!!!!!!!!!!
+!                                                                          Check
+C 1234 Book 1
+!                                                            Not null and unique
+A BC.00 1 1
+A BC.00 2 2
+A BC.00 3 3
+A BC.00 4 4
+!                                                                    Primary key
+A CD.00 1 1
+! Duplicate primary key:
+A CD.00 1 2
+D CD.00 1
+!                                                                    Foreign key
+A DE.00 1 1
+A DE.00 2 2
+A DE.00 3 3
+A DE.00 4 4
+! Existing foreign key:
+C 1234 Book 1
+D Book_info CD-1234-5678
+!                                                                 Attribute type
+! Float instead of int:
+A EF.00 1 1.23
+! String instead of int:
+A EF.00 2 "hello"
+!                                                              On delete cascade
+A FG.00 1 1
+A FG.00 2 2
+A FG.00 3 3
+A FG.00 4 4
+! Existing foreign key
+C 1234 Book_info 1
+D Book_info CD-1234-5678
+!                                                   Generated always as identity
+A GH.00 1
+A GH.00 2
+A GH.00 3
+D GH.00 1
+!!!!!!!INTEGRITY CONSTRAINT createdb.sql STUDENT-MADE TESTS: Book_author!!!!!!!!
+!                                                                       Not null
+AK AA.00 “” { } HC { }
+AK “” “BOOK” { } HC { }
+!                                                                   Primary key
+AK AA.00 “BOOK” { AUTHOR } HC { }
+AK AA.00 “BOOK” { AUTHOR } HC { }
+!                                                                    Foreign key
+AK BB.00 “BOOK” { AUTHOR } HC { }
+!                                                              On delete cascade
+DK AA.00 1
+!!!!!!!INTEGRITY CONSTRAINT createdb.sql STUDENT-MADE TESTS: Book_keyword!!!!!!!
+!                                                                          Check
+AK AA.00 “BOOK” { “KEY WORD” } HC { }
+!                                                                       Not null
+AK AA.00 “” { } HC { }
+AK “” “BOOK” { } HC { }
+!                                                                    Primary key
+AK AA.00 “BOOK” { KEYWORD } HC { }
+AK AA.00 “BOOK” { KEYWORD } HC { }
+!                                                                    Foreign key
+AK BB.00 “BOOK” { KEYWORD } HC { }
+!                                                              On delete cascade
+DK AA.00 1
+!!!!!!!INTEGRITY CONSTRAINT createdb.sql STUDENT-MADE TESTS: Checked_out!!!!!!!!
+!                                                                       Not null
+C “” 1 1234
+C AA.00 “” 1234
+C AA.00 1 “”
+C AA.00 1 1234 “”
+!                                                                    Primary key
+C AA.00 1 1234
+C AA.00 1 1234
+!                                                                    Foreign key
+C BB.00 1 1234
+C AA.00 1 5678
+!                                                              On delete cascade
+DK AA.00 1
+!!!!!!!!!TRIGGER createdb.sql STUDENT-MADE TESTS: assess_fine_trigger!!!!!!!!!!!
+!                                                   Assess fine for overdue book
+30 R AA.00 1 G 1234
+!                                              No fine for returned on time book
+0 R AA.00 2 G 1234
+!!!!!!!!!TRIGGER createdb.sql STUDENT-MADE TESTS: checkout_limit_trigger!!!!!!!!
+!                                               Prevent checkout exceeding limit
+C 1234 AA.00 1
+C 1234 AA.00 2
+C 1234 AA.00 3
+!                                                    Allow checkout within limit
+C 1234 AA.00 1
+C 1234 AA.00 2
+!!!!!!TRIGGER createdb.sql STUDENT-MADE TESTS: cant_delete_borrower_trigger!!!!!
+
+!                                 Prevent delete borrower with books checked out
+C 1234 AA.00 1
+DR 1234
+!                                Allow delete borrower with no books checked out
+DR 1234
+!!!!!!!!!!INTEGRITY CONSTRAINT createdb.sql STUDENT-MADE TESTS: Fine!!!!!!!!!!!!
+!                                                                       Not null
+F “” “BOOK” 2023-01-01 2023-01-02 1.00
+F 1234 “” 2023-01-01 2023-01-02 1.00
+F 1234 “BOOK” “” 2023-01-02 1.00
+F 1234 “BOOK” 2023-01-01 “” 1.00
+F 1234 “BOOK” 2023-01-01 2023-01-02 “”
+!                                                                    Primary key
+F 1234 “BOOK” 2023-01-01 2023-01-02 1.00
+F 1234 “BOOK” 2023-01-01 2023-01-02 1.00
+!                                                                    Foreign key
+F 5678 “BOOK” 2023-01-01 2023-01-02 1.00
+!                                                              On delete cascade
+DR 1234
+!!!!!!!!!!!!!!STUDENT-MADE TESTS SPECIFIC TO Database.sqlj CHANGES!!!!!!!!!!!!!!
+!                                                                    addBorrower
+! Add Jack:
+AR 0007 Smith Jack {555-5555 555-5556} Student
+! Look him up:
+PR
+!                                                         getBorrowerInformation
+! Add a new borrower to the database:
+AR 1234 Smith John {555-1234 555-5678} Student
+! Edit a borrower’s information in the database:
+ER 1234 Smith John {555-1234 555-5678} Faculty
+! Delete a borrower from the database:
+DR 1234
+! Get fine information for a borrower:
+G 1234
+! Pay a fine for a borrower:
+F 1234 "Book Title" 2022-04-17
+!                                                                 updateBorrower
+! Update a borrower’s last name:
+ER 1234 Johnson Jane {555-4321 555-8765} Student
+! Update a borrower’s first name:
+ER 1234 John Jane {555-4321 555-8765} Student
+! Update a borrower’s phones:
+ER 1234 John Jane {555-1111 555-2222} Student
+! Update a borrower’s category:
+ER 1234 John Jane {555-4321 555-8765} Faculty
+!                                                                 deleteBorrower
+! Add aadvark:
+AR 1234 AARDVARK ANTHONY { 123-4567 X1234 } PEON
+! Delete aardvark:
+DR 1234
+! Fail to print data about aardvark:
+PR 1234
+!                                                                 borrowerReport
+! Print a report of borrowers:
+PR
+! Print a report of borrowers after adding a new borrower:
+AR 1234 Smith John {555-1234 555-5678} Student
+PR
+! Print a report of borrowers after editing a borrower’s information:
+ER 1234 Johnson Jane {555-4321 555-8765} Faculty
+PR
+! Print a report of borrowers after deleting a borrower:
+DR 1234
+PR
+! Create a book to test with
+AK AA.00 "LEGITIMATE BOOK" { AARDVARK ZEBRA } HC { ORIGINAL WORDS }
+! Print a report of borrowers after checking out a book:
+C 1234 AA.00 1
+PR
+! Print a report of borrowers after returning a book:
+R 1234 AA.00 1
+PR
+! Print a report of borrowers after renewing a book:
+W 1234 AA.00 1
+PR

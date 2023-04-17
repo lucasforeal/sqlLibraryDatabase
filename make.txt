@@ -1,0 +1,10 @@
+#! /bin/bash
+echo Ignore warning about undefined parameter type Fine
+(cd semesterproject && sqlj -compile=false Database.sqlj)
+javac -classpath project.jar:$CLASSPATH semesterproject/Database.java
+echo Please enter password when prompted for it
+(cd semesterproject && java -cp ..:$CLASSPATH Bind \
+	-rootpkgname project \
+	-url jdbc:db2:project \
+	-user db2inst1 \
+	Database_SJProfile0.ser)

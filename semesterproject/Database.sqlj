@@ -818,16 +818,28 @@ return new Date(calendar.getTime().getTime());
                             List phones,
                             String category) throws ErrorMessage
     {
-// STUB
-if (borrowerID.equals("BAD")) throw new ErrorMessage("Error message test addBorrower");
-Object [] newInformation = new Object[5];
-newInformation[0] = borrowerID;
-newInformation[1] = lastName;
-newInformation[2] = firstName;
-newInformation[3] = phones;
-newInformation[4] = category;
-// STUB
-System.out.println("addBorrower(" + toString(newInformation) + ") called");
+        try {
+            // insert info for borrower
+            #sql { insert into Borrower
+                        values (:borrowerID, :lastName, :firstName, :category)
+                };
+
+            // insert phone(s) of borrower
+            Iterator phoneIterator = phones.iterator();
+            while (phoneIterator.hasNext())
+            {
+                String phone = (String) phoneIterator.next();
+
+                #sql { insert into Borrower_phone
+                        values(:borrowerID, :phone)
+                    };
+            }
+
+            #sql { commit };
+        }
+        catch (SQLException e) {
+            rollback();
+        }
     }
 
     /** Get information on an existing borrower about to be edited or deleted
@@ -841,19 +853,55 @@ System.out.println("addBorrower(" + toString(newInformation) + ") called");
      *  @exception an ErrorMessage is thrown with an appropriate message if
      *          the borrower does not exist
      */
+     #sql iterator BorrowerInfoCursor(String);
+     
     public Object [] getBorrowerInformation(String borrowerID) throws ErrorMessage
     {
         List originalPhones = new ArrayList();
         Object [] values = new Object[5];
         values[0] = borrowerID;
-// STUB
-if (borrowerID.equals("BAD")) throw new ErrorMessage("Error message test getBorrowerInformation");
-values[1] = "Aardvark";
-values[2] = "Anthony";
-originalPhones.add("123-4567"); originalPhones.add("555-1212");
-        values[3] = originalPhones;
-values[4] = "Big Cheese";
-        return values;
+
+        try {
+            String lastName = null, firstName = null, category = null;
+
+            #sql { select last_name, first_name, category_name
+                        into :lastName, :firstName, :category
+                        from Borrower
+                        where borrower_id = :borrowerID
+                };
+
+                values[1] = lastName;
+                values[2] = firstName;
+                values[3] = category;
+
+                BorrowerInfoCursor cursor;
+
+                #sql cursor = { select phone
+                                from Borrower_phone
+                                where borrower_id = :borrowerID
+                                };
+
+                String phone = null;
+
+                while(true)
+                {
+                    #sql { fetch :cursor into :phone
+                        };
+
+                    if (cursor.endFetch()) break;
+
+                    originalPhones.add(phone);
+                }
+
+                values[3] = originalPhones;
+            }
+            catch (SQLException e) {
+            }
+            finally {
+                rollback();
+            }
+
+            return values;
     }
 
     /** Update stored information about a borrower
@@ -878,16 +926,36 @@ values[4] = "Big Cheese";
                                List newPhones,
                                String newCategory) throws ErrorMessage
     {
-// STUB
-if (borrowerID.equals("BAD2")) throw new ErrorMessage("Error message test updateBorrower");
-Object [] information = new Object[6];
-information[0] = borrowerID;
-information[1] = newLastName;
-information[2] = newFirstName;
-information[3] = originalPhones;
-information[4] = newPhones;
-information[5] = newCategory;
-System.out.println("updateBorrower(" + toString(information) + ") called");
+        try {
+            #sql { update Borrower
+                    set lastName = :newLastName,
+                    firstName = :newFirstName,
+                    category = :newCategory
+                    where borrowerID = :borrowerID
+            };
+
+            // Remove list of old phones
+            #sql { delete from Borrower_phone
+                        where borrowerID = :borrowerID
+                        };
+
+            // Insert new list of phones
+
+            Iterator newPhonesIterator = newPhones.iterator();
+
+            while(newPhonesIterator.hasNext())
+            {
+                String newPhone = (String) newPhonesIterator.next();
+				#sql { insert into Borrower_phone
+							values(:borrowerID, :newPhone)
+					 };
+            }
+
+            #sql { commit };
+        }
+        catch(SQLException e) {
+            rollback();
+        }
     }
 
     /** Delete a borrower
@@ -900,10 +968,19 @@ System.out.println("updateBorrower(" + toString(information) + ") called");
      */
     public void deleteBorrower(String borrowerID) throws ErrorMessage
     {
-// STUB
-Object [] information = new Object[1];
-information[0] = borrowerID;
-System.out.println("deleteBorrower(" + toString(information) + ") called");
+        try
+        {
+            #sql { delete from Borrower
+                        where borrower_id = :borrowerID
+                 };
+
+            #sql { commit };
+        }
+        catch(SQLException e)
+        {
+            rollback();
+            throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
     }
 
     /* ************************************************************************
@@ -1178,16 +1255,47 @@ stream.println("Book Keywords report");
      *  @exception an ErrorMessage is thrown if there is an unexpected error
      *             accessing the database.
      */
+     #sql iterator BorrowerReportCursor(String, String, String, String, String);
+
     public void borrowersReport(PrintStream stream) throws ErrorMessage
     {
-// STUB
+        try
+        {
+            BorrowerReportCursor cursor;
+
+            #sql cursor = { select Borrower.borrower_id,
+                                last_name,
+                                first_name,
+                                phone,
+                                category_name
+                            from Borrower
+                            left join Borrower_phone
+                            on Borrower.borrower_id = Borrower_phone.borrower_id
+                            order by Borrower.borrower_id
+                        };
+
             String [] BORROWERS_REPORT_HEADINGS = 
                 { "Borrower ID", "Last Name", "First Name", "Phone #", "Category" };
             int [] BORROWERS_REPORT_COLUMN_WIDTHS =
                 { 12, 22, 22, 22, 10 };
             boolean [] BORROWERS_REPORT_REPEAT_COLUMNS =
                 { true, true, true, false, true };
-stream.println("Borrowers report");               
+
+            produceReport(stream,
+                "Categories Report",
+                BORROWERS_REPORT_HEADINGS,
+                BORROWERS_REPORT_COLUMN_WIDTHS,
+                BORROWERS_REPORT_REPEAT_COLUMNS,
+                cursor.getResultSet());
+            
+            cursor.close();
+        }
+        catch (SQLException e) {
+            throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
+        finally {
+            rollback();
+        }            
     }
 
     /** Produce a list of all fines outstanding - borrower name and
