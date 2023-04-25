@@ -138,9 +138,23 @@ public class Database
      */
     public String getBorrowerName(String borrowerID) throws ErrorMessage
     {
-// STUB
-if (borrowerID.equals("BAD")) throw new ErrorMessage("Error message test getBorrowerName");
-return "??? name ???";
+        try {
+            String lastName = null, firstName = null;
+
+            #sql { select last_name, first_name
+                        into :lastName, :firstName
+                        from Borrower
+                        where borrower_id = :borrowerID
+                };
+
+            return firstName + ' ' + lastName;
+        }
+        catch(SQLException e) {
+            throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
+        finally {
+            rollback();
+        }
     }
 
     /** Check out a book.
@@ -158,13 +172,13 @@ return "??? name ???";
                              String callNumber,
                              short copyNumber) throws ErrorMessage
     {
-// STUB
-if (callNumber.equals("BAD")) throw new ErrorMessage("Error message test checkOutBook");
-System.out.println("Check out " + callNumber + " " +
-copyNumber + " to " + borrowerID);
-Calendar calendar = Calendar.getInstance();
-calendar.add(Calendar.DATE, 10);
-return new Date(calendar.getTime().getTime());
+        // STUB
+        if (callNumber.equals("BAD")) throw new ErrorMessage("Error message test checkOutBook");
+        System.out.println("Check out " + callNumber + " " +
+        copyNumber + " to " + borrowerID);
+        Calendar calendar = Calendar.getInstance();
+        calendar.add(Calendar.DATE, 10);
+        return new Date(calendar.getTime().getTime());
     }
 
     /** Return a book.  If an overdue fine is incurred, it will be recorded
@@ -180,24 +194,24 @@ return new Date(calendar.getTime().getTime());
      */
     public void returnBook(String callNumber, short copyNumber) throws ErrorMessage
     {
-// STUB
-if (callNumber.equals("BAD")) throw new ErrorMessage("Error message test returnBook");
-System.out.println("Return " + callNumber + " " + copyNumber);
-// Days late should be calculated from the checkout record in the database -
-// this uses the copyNumber to facilitate testing - a book with a copy number
-// greater than 10 is considered late that many days.
-int daysLate = (copyNumber > 10) ? copyNumber : 0;
+        // STUB
+        if (callNumber.equals("BAD")) throw new ErrorMessage("Error message test returnBook");
+        System.out.println("Return " + callNumber + " " + copyNumber);
+        // Days late should be calculated from the checkout record in the database -
+        // this uses the copyNumber to facilitate testing - a book with a copy number
+        // greater than 10 is considered late that many days.
+        int daysLate = (copyNumber > 10) ? copyNumber : 0;
         
-// The following line should be incorporated into your code, to be executed
-// if the book is late (after calculating daysLate in the database, of course),
-// and before inserting a new row into the Fine table.   It uses the symbolic 
-// constant DAILY_FINE_RATE in class Fine - which gives the rate in cents, 
-// whereas the Fine table in the database holds the amount in dollars.
+        // The following line should be incorporated into your code, to be executed
+        // if the book is late (after calculating daysLate in the database, of course),
+        // and before inserting a new row into the Fine table.   It uses the symbolic 
+        // constant DAILY_FINE_RATE in class Fine - which gives the rate in cents, 
+        // whereas the Fine table in the database holds the amount in dollars.
 
         BigDecimal fineAmount = new BigDecimal(Fine.DAILY_FINE_RATE * .01 * daysLate).
             setScale(2, BigDecimal.ROUND_HALF_UP);
 
-// Include the following at the very end of your code
+        // Include the following at the very end of your code
 
         if (daysLate > 0)
             throw new ErrorMessage("Book is overdue " + daysLate + " days " +
@@ -216,19 +230,19 @@ int daysLate = (copyNumber > 10) ? copyNumber : 0;
      */
     public Date renewBook(String callNumber, short copyNumber) throws ErrorMessage
     {
-// STUB
-if (callNumber.equals("BAD")) throw new ErrorMessage("Error message test renewBook");
-System.out.println("Renew " + callNumber + " " + copyNumber);
-Calendar calendar = Calendar.getInstance();
-calendar.add(Calendar.DATE, 10);
-// Days late should be calculated from the checkout record in the database -
-// this uses the copyNumber to facilitate testing - a book with a copy number
-// greater than 10 is considered late that many days.
-int daysLate = (copyNumber > 10) ? copyNumber : 0;
+        // STUB
+        if (callNumber.equals("BAD")) throw new ErrorMessage("Error message test renewBook");
+        System.out.println("Renew " + callNumber + " " + copyNumber);
+        Calendar calendar = Calendar.getInstance();
+        calendar.add(Calendar.DATE, 10);
+        // Days late should be calculated from the checkout record in the database -
+        // this uses the copyNumber to facilitate testing - a book with a copy number
+        // greater than 10 is considered late that many days.
+        int daysLate = (copyNumber > 10) ? copyNumber : 0;
 
-// The following line should be incorporated into your code, to be executed
-// if the book is late (after calculating daysLate in the database, of course),
-
+        // The following line should be incorporated into your code, to be executed
+        // if the book is late (after calculating daysLate in the database, of course),
+        
         if (daysLate > 0)
         {
             rollback();
@@ -236,7 +250,7 @@ int daysLate = (copyNumber > 10) ? copyNumber : 0;
                 " days and cannot be renewed");
         }
 
-return new Date(calendar.getTime().getTime());
+        return new Date(calendar.getTime().getTime());
     }
 
     /* ************************************************************************
@@ -819,17 +833,17 @@ return new Date(calendar.getTime().getTime());
                             String category) throws ErrorMessage
     {
         try {
-            // insert info for borrower
+            // insert borrower info
             #sql { insert into Borrower
                         values (:borrowerID, :lastName, :firstName, :category)
                 };
-
-            // insert phone(s) of borrower
+            
+            // insert borrower phone(s)
             Iterator phoneIterator = phones.iterator();
             while (phoneIterator.hasNext())
             {
                 String phone = (String) phoneIterator.next();
-
+                        
                 #sql { insert into Borrower_phone
                         values(:borrowerID, :phone)
                     };
@@ -839,6 +853,19 @@ return new Date(calendar.getTime().getTime());
         }
         catch (SQLException e) {
             rollback();
+
+            if (e.getErrorCode() == DUPLICATE_KEY_SQL_ERROR)
+            {
+                // duplicate key error either occur on Borrower or Borrower_phone insertion
+                if (e.getMessage().indexOf(BORROWER_PHONE_TABLE_NAME) >= 0)
+                    throw new ErrorMessage("Duplicate phone for this borrower");
+                else
+                    throw new ErrorMessage("Duplicate borrower id for this borrower");
+            }
+            else if (e.getMessage().indexOf(BORROWER_CATEGORY_FOREIGN_CONSTRAINT) >= 0)
+                throw new ErrorMessage("Invalid category");
+            else
+                throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
         }
     }
 
@@ -853,8 +880,8 @@ return new Date(calendar.getTime().getTime());
      *  @exception an ErrorMessage is thrown with an appropriate message if
      *          the borrower does not exist
      */
-     #sql iterator BorrowerInfoCursor(String);
-     
+    #sql iterator BorrowerInfoCursor(String);
+
     public Object [] getBorrowerInformation(String borrowerID) throws ErrorMessage
     {
         List originalPhones = new ArrayList();
@@ -870,38 +897,42 @@ return new Date(calendar.getTime().getTime());
                         where borrower_id = :borrowerID
                 };
 
-                values[1] = lastName;
-                values[2] = firstName;
-                values[3] = category;
+            values[1] = lastName;
+            values[2] = firstName;
+            values[4] = category;
 
-                BorrowerInfoCursor cursor;
+            BorrowerInfoCursor cursor;
 
-                #sql cursor = { select phone
+            #sql cursor = { select phone
                                 from Borrower_phone
                                 where borrower_id = :borrowerID
-                                };
-
-                String phone = null;
-
-                while(true)
-                {
-                    #sql { fetch :cursor into :phone
                         };
+                
+            String phone = null;
 
-                    if (cursor.endFetch()) break;
+            while(true)
+            {
+                #sql { fetch :cursor into :phone
+                    };
+                    
+                if (cursor.endFetch()) break;
 
-                    originalPhones.add(phone);
-                }
-
-                values[3] = originalPhones;
+                originalPhones.add(phone);
             }
-            catch (SQLException e) {
-            }
-            finally {
-                rollback();
-            }
+            
+            values[3] = originalPhones;
+        }
+        catch(SQLException e) {
+            if (e.getSQLState().equals(NO_ROW_SQL_STATE))
+                throw new ErrorMessage("No such borrower");
+            else
+                throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
+        finally {
+            rollback();
+        }
 
-            return values;
+        return values;
     }
 
     /** Update stored information about a borrower
@@ -928,16 +959,15 @@ return new Date(calendar.getTime().getTime());
     {
         try {
             #sql { update Borrower
-                    set lastName = :newLastName,
-                    firstName = :newFirstName,
-                    category = :newCategory
-                    where borrowerID = :borrowerID
-            };
-
-            // Remove list of old phones
+                    set last_name = :newLastName, first_name = :newFirstName, category_name = :newCategory
+                    where borrower_id = :borrowerID
+                };
+            
+            // Remove old list of phones
+            
             #sql { delete from Borrower_phone
-                        where borrowerID = :borrowerID
-                        };
+                        where borrower_id = :borrowerID
+                };
 
             // Insert new list of phones
 
@@ -950,11 +980,19 @@ return new Date(calendar.getTime().getTime());
 							values(:borrowerID, :newPhone)
 					 };
             }
-
+            
             #sql { commit };
         }
         catch(SQLException e) {
             rollback();
+            
+            if (e.getErrorCode() == DUPLICATE_KEY_SQL_ERROR)
+                // duplicate key error only occurs on Borrower_phone insertion
+                throw new ErrorMessage("Duplicate phone for this borrower");
+            else if (e.getMessage().indexOf(BORROWER_CATEGORY_FOREIGN_CONSTRAINT) >= 0)
+                throw new ErrorMessage("Invalid category");
+            else
+                throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
         }
     }
 
@@ -973,13 +1011,19 @@ return new Date(calendar.getTime().getTime());
             #sql { delete from Borrower
                         where borrower_id = :borrowerID
                  };
-
+          
             #sql { commit };
         }
         catch(SQLException e)
         {
             rollback();
-            throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+            
+            if (e.getSQLState().equals(NO_ROW_SQL_STATE))
+                throw new ErrorMessage("No such borrower");
+            else if (e.getSQLState().equals(CANT_DELETE_BORROWER_WITH_BOOK_CHECKED_OUT))
+                throw new ErrorMessage("This borrower has book(s) checked out");
+            else
+                throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
         }
     }
 
@@ -1255,12 +1299,11 @@ stream.println("Book Keywords report");
      *  @exception an ErrorMessage is thrown if there is an unexpected error
      *             accessing the database.
      */
-     #sql iterator BorrowerReportCursor(String, String, String, String, String);
+    #sql iterator BorrowerReportCursor(String, String, String, String, String);
 
     public void borrowersReport(PrintStream stream) throws ErrorMessage
     {
-        try
-        {
+        try {
             BorrowerReportCursor cursor;
 
             #sql cursor = { select Borrower.borrower_id,
@@ -1280,14 +1323,14 @@ stream.println("Book Keywords report");
                 { 12, 22, 22, 22, 10 };
             boolean [] BORROWERS_REPORT_REPEAT_COLUMNS =
                 { true, true, true, false, true };
-
+            
             produceReport(stream,
-                "Categories Report",
+                "Borrowers Report",
                 BORROWERS_REPORT_HEADINGS,
                 BORROWERS_REPORT_COLUMN_WIDTHS,
                 BORROWERS_REPORT_REPEAT_COLUMNS,
                 cursor.getResultSet());
-            
+
             cursor.close();
         }
         catch (SQLException e) {
@@ -1529,15 +1572,29 @@ stream.println("Overdue Books report");
     private static final int BAD_PASSWORD_SQL_ERROR = -1403;
     private static final String NO_ROW_SQL_STATE = "02000";
     private static final int DUPLICATE_KEY_SQL_ERROR = -803;
+    
+    // SQL states thrown by triggers
+    private static final String CANT_RENEW_OVERDUE = "70000";
+    private static final String CANT_DELETE_BORROWER_WITH_BOOK_CHECKED_OUT = "70001";
+    private static final String REACHED_MAX_BOOK_CHECKED_OUT_LIMIT = "70002";
 
+    // Symbolic names for constraints
+    
     private static final String BOOK_INFO_VALID_FORMAT_CONSTRAINT = 
-        "~~~ YOU NEED TO FILL THIS IN ~~~";
+        "CHK_FORMAT";
     private static final String BOOK_KEYWORD_VALID_KEYWORD_CONSTRAINT = 
-        "~~~ YOU NEED TO FILL THIS IN ~~~";
+        "CHK_KEYWORD";
     private static final String BORROWER_CATEGORY_FOREIGN_CONSTRAINT =
-        "~~~ YOU NEED TO FILL THIS IN ~~~";
+        "FK_CATEGORY_NAME";
+    
+    // unimplemented
+    private static final String CATEGORY_CHECKOUT_PERIOD_CONSTRAINT = 
+        "CHK_CHECKOUT_PERIOD";
+    private static final String CATEGORY_MAX_BOOKS_OUT_CONSTRAINT = 
+        "CHK_MAX_BOOKS_OUT";
    
     private static final String BOOK_AUTHOR_TABLE_NAME = "BOOK_AUTHOR";
+    private static final String BORROWER_PHONE_TABLE_NAME = "BORROWER_PHONE";
     
     private static final String DRIVER_NAME = "com.ibm.db2.jcc.DB2Driver";
     private static final String DATABASE_URL =
