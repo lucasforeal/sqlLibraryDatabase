@@ -240,15 +240,6 @@ public class Database
         // greater than 10 is considered late that many days.
         int daysLate = (copyNumber > 10) ? copyNumber : 0;
 
-        // The following line should be incorporated into your code, to be executed
-        // if the book is late (after calculating daysLate in the database, of course),
-        
-        if (daysLate > 0)
-        {
-            rollback();
-            throw new ErrorMessage("Book is overdue " + daysLate +
-                " days and cannot be renewed");
-        }
 
         return new Date(calendar.getTime().getTime());
     }
