@@ -174,14 +174,49 @@ public class Database
     public Date checkOutBook(String borrowerID,
                              String callNumber,
                              short copyNumber) throws ErrorMessage
-    {
-        // STUB
-        if (callNumber.equals("BAD")) throw new ErrorMessage("Error message test checkOutBook");
-        System.out.println("Check out " + callNumber + " " +
-        copyNumber + " to " + borrowerID);
-        Calendar calendar = Calendar.getInstance();
-        calendar.add(Calendar.DATE, 10);
-        return new Date(calendar.getTime().getTime());
+    {   
+        try
+        {
+            int checkoutPeriod;
+
+            #sql { select checkout_period
+                    into :checkoutPeriod
+                    from Category
+                    left join Borrower
+                    on Category.category_name = Borrower.category_name
+                    where borrower_id = :borrowerID
+                };
+
+            #sql { insert into Checked_out
+                    values(:callNumber, :copyNumber, :borrowerID, today + :checkoutPeriod days)
+                };
+
+            Date dateDue;
+
+            #sql { select date_due
+                    into :dateDue
+                    from Checked_out
+                    where call_number = :callNumber
+                    and copy_number = :copyNumber
+                };
+
+            #sql { commit };
+
+            return dateDue;
+        }
+        catch(SQLException e)
+        {
+            rollback();
+            // borrower id is checked when getting the borrower name, so no need to check here
+            if(e.getErrorCode() == INVALID_FOREIGN_KEY_ERROR)
+                throw new ErrorMessage("No such book");
+            else if (e.getErrorCode() == DUPLICATE_KEY_SQL_ERROR)
+                throw new ErrorMessage("Book already checkout");
+            else if(e.getSQLState().equals(REACHED_MAX_BOOK_CHECKED_OUT_LIMIT))
+                throw new ErrorMessage("Borrower reached max book checkout limit");
+            else
+                throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
     }
 
     /** Return a book.  If an overdue fine is incurred, it will be recorded
