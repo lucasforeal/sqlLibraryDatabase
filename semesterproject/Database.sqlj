@@ -733,9 +733,6 @@ public class Database
     {
         try
         {
-            // on delete cascade does work, however the trigger that calculates fine
-            // throws a SQL error when the book is overdue, otherwise there's no
-            // issue with the on delete cascade, see Return Book function
             #sql { delete from Checked_out
                 where call_number = :callNumber and
                       copy_number = :copyNumber
