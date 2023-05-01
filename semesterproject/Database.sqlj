@@ -1205,9 +1205,22 @@ public class Database
      */
     public void payFine(String borrowerID, Fine fine) throws ErrorMessage
     {
-// STUB
-System.out.println("payFine() " + borrowerID + " " + fine.getAmountDue() + " called");
+        try {
+            String title = fine.getValues()[0];
+            Date dateDue = fine.getDateDue();
+            #sql { delete from Fine
+                    where borrower_id = :borrowerID
+                    and title = :title
+                    and date_due = :dateDue
+                };
+            
+            #sql { commit };
+        }
+        catch(SQLException e) {
+            throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
     }
+
 
     /* ************************************************************************
      * Methods called to produce various kinds of report
@@ -1283,16 +1296,45 @@ System.out.println("payFine() " + borrowerID + " " + fine.getAmountDue() + " cal
      *  @exception an ErrorMessage is thrown if there is an unexpected error
      *             accessing the database.
      */
+    #sql iterator BookCopiesReportCursor(int, String, int, String);
+
     public void bookCopiesReport(PrintStream stream) throws ErrorMessage
     {
-// STUB
-            String [] BOOKS_COPIES_REPORT_HEADINGS = 
-                { "Bar Code", "Call Number", "Copy #", "Title" };
-            int [] BOOKS_COPIES_REPORT_COLUMN_WIDTHS =
-                { 13, 22, 8, 50 };
-            boolean [] BOOKS_COPIES_REPORT_REPEAT_COLUMNS =
-                { false, false, false, false };
-stream.println("Book Copies report");        
+        try {
+                BookCopiesReportCursor cursor;
+
+                #sql cursor = { select bar_code,
+                                    Book.call_number,
+                                    copy_number,
+                                    title
+                                from Book left join Book_info
+                                on Book.call_number = Book_info.call_number
+                                order by bar_code
+                };
+
+                String [] BOOKS_COPIES_REPORT_HEADINGS = 
+                    { "Bar Code", "Call Number", "Copy #", "Title" };
+                int [] BOOKS_COPIES_REPORT_COLUMN_WIDTHS =
+                    { 13, 22, 8, 50 };
+                boolean [] BOOKS_COPIES_REPORT_REPEAT_COLUMNS =
+                    { false, false, false, false };
+
+                produceReport(stream,
+                    "Book Copies Report",
+                    BOOKS_COPIES_REPORT_HEADINGS,
+                    BOOKS_COPIES_REPORT_COLUMN_WIDTHS,
+                    BOOKS_COPIES_REPORT_REPEAT_COLUMNS,
+                    cursor.getResultSet());
+                cursor.close();
+            }
+            catch(SQLException e)
+            {
+                throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+            }
+            finally
+            {
+                rollback();
+            }
     }
 
     /** Produce a keywords report - keywords listed in alphabetical order,
@@ -1303,16 +1345,44 @@ stream.println("Book Copies report");
      *  @exception an ErrorMessage is thrown if there is an unexpected error
      *             accessing the database.
      */
+     #sql iterator KeywordsReportCursor(String, String, String);
+
     public void keywordsReport(PrintStream stream) throws ErrorMessage
     {
-// STUB
+        try {
+            KeywordsReportCursor cursor;
+
+            #sql cursor = { select keyword,
+                                Book_keyword.call_number,
+                                title
+                            from Book_keyword left join Book_info
+                            on Book_keyword.call_number = Book_info.call_number
+                            order by keyword, Book_keyword.call_number
+            };
+
             String [] BOOKS_KEYWORD_REPORT_HEADINGS = 
                 { "Keyword", "Call Number", "Title" };
             int [] BOOKS_KEYWORD_REPORT_COLUMN_WIDTHS =
                 { 22, 22, 50 };
             boolean [] BOOKS_KEYWORD_REPORT_REPEAT_COLUMNS =
                 { false, false, false };
-stream.println("Book Keywords report");            
+
+            produceReport(stream,
+                "Book Keywords Report",
+                BOOKS_KEYWORD_REPORT_HEADINGS,
+                BOOKS_KEYWORD_REPORT_COLUMN_WIDTHS,
+                BOOKS_KEYWORD_REPORT_REPEAT_COLUMNS,
+                cursor.getResultSet());
+            cursor.close();
+        }
+        catch(SQLException e)
+        {
+            throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
+        finally
+        {
+            rollback();
+        }   
     }
 
     /** Produce a list of all categories - name, max books out, checkout period
@@ -1415,16 +1485,47 @@ stream.println("Book Keywords report");
      *  @exception an ErrorMessage is thrown if there is an unexpected error
      *             accessing the database.
      */
+    #sql iterator FineReportCursor(String, String, String, double);
+
     public void finesReport(PrintStream stream) throws ErrorMessage
     {
-// STUB
+        try {
+            FineReportCursor cursor;
+
+            #sql cursor = { select last_name,
+                                first_name,
+                                phone,
+                                sum(amount) as total
+                            from Fine left join Borrower
+                            on Fine.borrower_id = Borrower.borrower_id
+                            left join Borrower_phone
+                            on Borrower.borrower_id = Borrower_phone.borrower_id
+                            group by last_name, first_name, phone
+                            order by total desc
+                        };
+
             String [] FINES_REPORT_HEADINGS = 
                 { "Last Name", "First Name", "Phone #", "Total Fines" };
             int [] FINES_REPORT_COLUMN_WIDTHS =
                 { 22, 22, 22, 11 };
             boolean [] FINES_REPORT_REPEAT_COLUMNS =
                 { true, true, false, true };
-stream.println("Fines report");         
+
+            produceReport(stream,
+                "Fines Report",
+                FINES_REPORT_HEADINGS,
+                FINES_REPORT_COLUMN_WIDTHS,
+                FINES_REPORT_REPEAT_COLUMNS,
+                cursor.getResultSet());
+
+            cursor.close();
+        }
+        catch (SQLException e) {
+            throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
+        finally {
+            rollback();
+        }   
     }
 
     /** Produce a list of all overdue books - borrower name,
@@ -1435,16 +1536,51 @@ stream.println("Fines report");
      *  @exception an ErrorMessage is thrown if there is an unexpected error
      *             accessing the database.
      */
+    #sql iterator OverdueBookReportCursor(String, String, String, Date);
+
     public void overdueBooksReport(PrintStream stream) throws ErrorMessage
     {
-// STUB
+        try {
+            OverdueBookReportCursor cursor;
+
+            #sql cursor = { select last_name,
+                                first_name,
+                                title,
+                                date_due
+                            from Checked_out
+                            left join Book
+                            on Checked_out.call_number = Book.call_number
+                            and Checked_out.copy_number = Book.copy_number
+                            left join Book_info
+                            on Book.call_number = Book_info.call_number
+                            left join Borrower
+                            on Checked_out.borrower_id = Borrower.borrower_id
+                            where date_due < today
+                            order by last_name, first_name, date_due
+                        };
+
             String [] OVERDUE_BOOKS_REPORT_HEADINGS = 
                 { "Last Name", "First Name", "Title", "Date Due" };
             int [] OVERDUE_BOOKS_REPORT_COLUMN_WIDTHS =
                 { 22, 22, 52, 10 };
             boolean [] OVERDUE_BOOKS_REPORT_REPEAT_COLUMNS =
-                { true, true, false, false };            
-stream.println("Overdue Books report");
+                { true, true, false, false };    
+            
+            produceReport(stream,
+                "Overdue Books Report",
+                OVERDUE_BOOKS_REPORT_HEADINGS,
+                OVERDUE_BOOKS_REPORT_COLUMN_WIDTHS,
+                OVERDUE_BOOKS_REPORT_REPEAT_COLUMNS,
+                cursor.getResultSet());
+
+            cursor.close();
+        }
+        catch (SQLException e) {
+            throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
+        finally {
+            rollback();
+        }
     }
 
     /* ************************************************************************
@@ -1638,18 +1774,22 @@ stream.println("Overdue Books report");
     private static final int BAD_PASSWORD_SQL_ERROR = -1403;
     private static final String NO_ROW_SQL_STATE = "02000";
     private static final int DUPLICATE_KEY_SQL_ERROR = -803;
-    
+    private static final int INVALID_FOREIGN_KEY_ERROR = -530;
+
     // SQL states thrown by triggers
     private static final String CANT_RENEW_OVERDUE = "70000";
     private static final String CANT_DELETE_BORROWER_WITH_BOOK_CHECKED_OUT = "70001";
     private static final String REACHED_MAX_BOOK_CHECKED_OUT_LIMIT = "70002";
 
     // Symbolic names for constraints
-    
     private static final String BOOK_INFO_VALID_FORMAT_CONSTRAINT = 
         "CHK_FORMAT";
     private static final String BOOK_KEYWORD_VALID_KEYWORD_CONSTRAINT = 
         "CHK_KEYWORD";
+        private static final String CATEGORY_MAX_BOOKS_OUT_CONSTRAINT = 
+        "CHK_MAX_BOOKS_OUT";
+
+    // FK constraints
     private static final String BORROWER_CATEGORY_FOREIGN_CONSTRAINT =
         "FK_CATEGORY_NAME";
     
