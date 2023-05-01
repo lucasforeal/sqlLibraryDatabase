@@ -266,18 +266,57 @@ public class Database
      */
     public Date renewBook(String callNumber, short copyNumber) throws ErrorMessage
     {
-        // STUB
-        if (callNumber.equals("BAD")) throw new ErrorMessage("Error message test renewBook");
-        System.out.println("Renew " + callNumber + " " + copyNumber);
-        Calendar calendar = Calendar.getInstance();
-        calendar.add(Calendar.DATE, 10);
-        // Days late should be calculated from the checkout record in the database -
-        // this uses the copyNumber to facilitate testing - a book with a copy number
-        // greater than 10 is considered late that many days.
-        int daysLate = (copyNumber > 10) ? copyNumber : 0;
+        int daysLate = 0;
+        try {
+                
+            #sql { select days(today) - days(date_due)
+                    into :daysLate
+                    from Checked_out
+                    where call_number = :callNumber
+                    and copy_number = :copyNumber
+                };
+            
+            int checkoutPeriod;
 
+            #sql { select checkout_period
+                    into :checkoutPeriod
+                    from Checked_out
+                    left join Borrower
+                    on Checked_out.borrower_id = Borrower.borrower_id
+                    left join Category
+                    on Borrower.category_name = Category.category_name
+                    where call_number = :callNumber
+                    and copy_number = :copyNumber
+                };                
 
-        return new Date(calendar.getTime().getTime());
+            #sql { update Checked_out
+                    set date_due = today + :checkoutPeriod days
+                    where call_number = :callNumber
+                    and copy_number = :copyNumber
+                };
+            
+            Date newDateDue;
+
+            #sql { select date_due
+                    into :newDateDue
+                    from Checked_out
+                    where call_number = :callNumber
+                    and copy_number = :copyNumber
+            };
+            
+            #sql { commit };
+
+            return  newDateDue;
+        }
+        catch(SQLException e) {
+            rollback();
+            if (e.getSQLState().equals(CANT_RENEW_OVERDUE)) {
+                throw new ErrorMessage("Book is overdue " + daysLate +
+                " days and cannot be renewed");
+            }
+            else
+                throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
     }
 
     /* ************************************************************************
