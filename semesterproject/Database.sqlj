@@ -207,13 +207,13 @@ public class Database
         catch(SQLException e)
         {
             rollback();
-            // borrower id is checked when getting the borrower name, so no need to check here
+            
             if(e.getErrorCode() == INVALID_FOREIGN_KEY_ERROR)
                 throw new ErrorMessage("No such book");
             else if (e.getErrorCode() == DUPLICATE_KEY_SQL_ERROR)
-                throw new ErrorMessage("Book already checkout");
+                throw new ErrorMessage("Book already checked out");
             else if(e.getSQLState().equals(REACHED_MAX_BOOK_CHECKED_OUT_LIMIT))
-                throw new ErrorMessage("Borrower reached max book checkout limit");
+                throw new ErrorMessage("Borrower has reached the max book checkout limit");
             else
                 throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
         }
@@ -239,8 +239,8 @@ public class Database
                     where call_number = :callNumber
                     and copy_number = :copyNumber
                 };
-        
-        #sql { delete from Checked_out
+
+            #sql { delete from Checked_out
                     where call_number = :callNumber
                     and copy_number = :copyNumber
                 };
@@ -249,7 +249,7 @@ public class Database
         }
         catch(SQLException e) {
             if(e.getSQLState().equals(NO_ROW_SQL_STATE))
-                throw new ErrorMessage("Book has not been checked out yet");
+                throw new ErrorMessage("Book has not checked out yet");
             throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
         }
     }
@@ -733,6 +733,14 @@ public class Database
     {
         try
         {
+            // on delete cascade does work, however the trigger that calculates fine
+            // throws a SQL error when the book is overdue, otherwise there's no
+            // issue with the on delete cascade, see Return Book function
+            #sql { delete from Checked_out
+                where call_number = :callNumber and
+                      copy_number = :copyNumber
+            };
+
             #sql { delete from Book
                         where call_number = :callNumber and
                               copy_number = :copyNumber
@@ -898,6 +906,7 @@ public class Database
                             List phones,
                             String category) throws ErrorMessage
     {
+        
         try {
             // insert borrower info
             #sql { insert into Borrower
@@ -1077,7 +1086,7 @@ public class Database
             #sql { delete from Borrower
                         where borrower_id = :borrowerID
                  };
-          
+                 
             #sql { commit };
         }
         catch(SQLException e)
@@ -1221,7 +1230,6 @@ public class Database
         }
     }
 
-
     /* ************************************************************************
      * Methods called to produce various kinds of report
      * ***********************************************************************/
@@ -1300,7 +1308,7 @@ public class Database
 
     public void bookCopiesReport(PrintStream stream) throws ErrorMessage
     {
-        try {
+            try {
                 BookCopiesReportCursor cursor;
 
                 #sql cursor = { select bar_code,
@@ -1345,7 +1353,7 @@ public class Database
      *  @exception an ErrorMessage is thrown if there is an unexpected error
      *             accessing the database.
      */
-     #sql iterator KeywordsReportCursor(String, String, String);
+    #sql iterator KeywordsReportCursor(String, String, String);
 
     public void keywordsReport(PrintStream stream) throws ErrorMessage
     {
@@ -1382,7 +1390,7 @@ public class Database
         finally
         {
             rollback();
-        }   
+        }        
     }
 
     /** Produce a list of all categories - name, max books out, checkout period
@@ -1486,7 +1494,7 @@ public class Database
      *             accessing the database.
      */
     #sql iterator FineReportCursor(String, String, String, double);
-
+    
     public void finesReport(PrintStream stream) throws ErrorMessage
     {
         try {
@@ -1510,7 +1518,7 @@ public class Database
                 { 22, 22, 22, 11 };
             boolean [] FINES_REPORT_REPEAT_COLUMNS =
                 { true, true, false, true };
-
+            
             produceReport(stream,
                 "Fines Report",
                 FINES_REPORT_HEADINGS,
@@ -1525,7 +1533,7 @@ public class Database
         }
         finally {
             rollback();
-        }   
+        }      
     }
 
     /** Produce a list of all overdue books - borrower name,
@@ -1775,7 +1783,7 @@ public class Database
     private static final String NO_ROW_SQL_STATE = "02000";
     private static final int DUPLICATE_KEY_SQL_ERROR = -803;
     private static final int INVALID_FOREIGN_KEY_ERROR = -530;
-
+    
     // SQL states thrown by triggers
     private static final String CANT_RENEW_OVERDUE = "70000";
     private static final String CANT_DELETE_BORROWER_WITH_BOOK_CHECKED_OUT = "70001";
@@ -1786,7 +1794,7 @@ public class Database
         "CHK_FORMAT";
     private static final String BOOK_KEYWORD_VALID_KEYWORD_CONSTRAINT = 
         "CHK_KEYWORD";
-        private static final String CATEGORY_MAX_BOOKS_OUT_CONSTRAINT = 
+    private static final String CATEGORY_MAX_BOOKS_OUT_CONSTRAINT = 
         "CHK_MAX_BOOKS_OUT";
 
     // FK constraints
@@ -1796,8 +1804,6 @@ public class Database
     // unimplemented
     private static final String CATEGORY_CHECKOUT_PERIOD_CONSTRAINT = 
         "CHK_CHECKOUT_PERIOD";
-    private static final String CATEGORY_MAX_BOOKS_OUT_CONSTRAINT = 
-        "CHK_MAX_BOOKS_OUT";
    
     private static final String BOOK_AUTHOR_TABLE_NAME = "BOOK_AUTHOR";
     private static final String BORROWER_PHONE_TABLE_NAME = "BORROWER_PHONE";
