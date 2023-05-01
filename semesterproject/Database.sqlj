@@ -232,28 +232,26 @@ public class Database
      */
     public void returnBook(String callNumber, short copyNumber) throws ErrorMessage
     {
-        // STUB
-        if (callNumber.equals("BAD")) throw new ErrorMessage("Error message test returnBook");
-        System.out.println("Return " + callNumber + " " + copyNumber);
-        // Days late should be calculated from the checkout record in the database -
-        // this uses the copyNumber to facilitate testing - a book with a copy number
-        // greater than 10 is considered late that many days.
-        int daysLate = (copyNumber > 10) ? copyNumber : 0;
+        try {
+            #sql { select call_number, copy_number
+                    into :callNumber, :copyNumber
+                    from Checked_out
+                    where call_number = :callNumber
+                    and copy_number = :copyNumber
+                };
         
-        // The following line should be incorporated into your code, to be executed
-        // if the book is late (after calculating daysLate in the database, of course),
-        // and before inserting a new row into the Fine table.   It uses the symbolic 
-        // constant DAILY_FINE_RATE in class Fine - which gives the rate in cents, 
-        // whereas the Fine table in the database holds the amount in dollars.
-
-        BigDecimal fineAmount = new BigDecimal(Fine.DAILY_FINE_RATE * .01 * daysLate).
-            setScale(2, BigDecimal.ROUND_HALF_UP);
-
-        // Include the following at the very end of your code
-
-        if (daysLate > 0)
-            throw new ErrorMessage("Book is overdue " + daysLate + " days " +
-                "- a fine of $" + fineAmount + " has been assessed");
+        #sql { delete from Checked_out
+                    where call_number = :callNumber
+                    and copy_number = :copyNumber
+                };
+            
+            #sql { commit };
+        }
+        catch(SQLException e) {
+            if(e.getSQLState().equals(NO_ROW_SQL_STATE))
+                throw new ErrorMessage("Book has not been checked out yet");
+            throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
     }
 
     /** Renew a book  If there is any problem, an appropriate error
