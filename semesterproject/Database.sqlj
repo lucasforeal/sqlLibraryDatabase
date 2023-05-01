@@ -150,7 +150,10 @@ public class Database
             return firstName + ' ' + lastName;
         }
         catch(SQLException e) {
-            throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+            if(e.getSQLState().equals(NO_ROW_SQL_STATE))
+                throw new ErrorMessage("No such borrower");
+            else
+                throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
         }
         finally {
             rollback();
@@ -171,14 +174,49 @@ public class Database
     public Date checkOutBook(String borrowerID,
                              String callNumber,
                              short copyNumber) throws ErrorMessage
-    {
-        // STUB
-        if (callNumber.equals("BAD")) throw new ErrorMessage("Error message test checkOutBook");
-        System.out.println("Check out " + callNumber + " " +
-        copyNumber + " to " + borrowerID);
-        Calendar calendar = Calendar.getInstance();
-        calendar.add(Calendar.DATE, 10);
-        return new Date(calendar.getTime().getTime());
+    {   
+        try
+        {
+            int checkoutPeriod;
+
+            #sql { select checkout_period
+                    into :checkoutPeriod
+                    from Category
+                    left join Borrower
+                    on Category.category_name = Borrower.category_name
+                    where borrower_id = :borrowerID
+                };
+
+            #sql { insert into Checked_out
+                    values(:callNumber, :copyNumber, :borrowerID, today + :checkoutPeriod days)
+                };
+
+            Date dateDue;
+
+            #sql { select date_due
+                    into :dateDue
+                    from Checked_out
+                    where call_number = :callNumber
+                    and copy_number = :copyNumber
+                };
+
+            #sql { commit };
+
+            return dateDue;
+        }
+        catch(SQLException e)
+        {
+            rollback();
+            // borrower id is checked when getting the borrower name, so no need to check here
+            if(e.getErrorCode() == INVALID_FOREIGN_KEY_ERROR)
+                throw new ErrorMessage("No such book");
+            else if (e.getErrorCode() == DUPLICATE_KEY_SQL_ERROR)
+                throw new ErrorMessage("Book already checkout");
+            else if(e.getSQLState().equals(REACHED_MAX_BOOK_CHECKED_OUT_LIMIT))
+                throw new ErrorMessage("Borrower reached max book checkout limit");
+            else
+                throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
     }
 
     /** Return a book.  If an overdue fine is incurred, it will be recorded
@@ -194,28 +232,26 @@ public class Database
      */
     public void returnBook(String callNumber, short copyNumber) throws ErrorMessage
     {
-        // STUB
-        if (callNumber.equals("BAD")) throw new ErrorMessage("Error message test returnBook");
-        System.out.println("Return " + callNumber + " " + copyNumber);
-        // Days late should be calculated from the checkout record in the database -
-        // this uses the copyNumber to facilitate testing - a book with a copy number
-        // greater than 10 is considered late that many days.
-        int daysLate = (copyNumber > 10) ? copyNumber : 0;
+        try {
+            #sql { select call_number, copy_number
+                    into :callNumber, :copyNumber
+                    from Checked_out
+                    where call_number = :callNumber
+                    and copy_number = :copyNumber
+                };
         
-        // The following line should be incorporated into your code, to be executed
-        // if the book is late (after calculating daysLate in the database, of course),
-        // and before inserting a new row into the Fine table.   It uses the symbolic 
-        // constant DAILY_FINE_RATE in class Fine - which gives the rate in cents, 
-        // whereas the Fine table in the database holds the amount in dollars.
-
-        BigDecimal fineAmount = new BigDecimal(Fine.DAILY_FINE_RATE * .01 * daysLate).
-            setScale(2, BigDecimal.ROUND_HALF_UP);
-
-        // Include the following at the very end of your code
-
-        if (daysLate > 0)
-            throw new ErrorMessage("Book is overdue " + daysLate + " days " +
-                "- a fine of $" + fineAmount + " has been assessed");
+        #sql { delete from Checked_out
+                    where call_number = :callNumber
+                    and copy_number = :copyNumber
+                };
+            
+            #sql { commit };
+        }
+        catch(SQLException e) {
+            if(e.getSQLState().equals(NO_ROW_SQL_STATE))
+                throw new ErrorMessage("Book has not been checked out yet");
+            throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
     }
 
     /** Renew a book  If there is any problem, an appropriate error
@@ -230,18 +266,57 @@ public class Database
      */
     public Date renewBook(String callNumber, short copyNumber) throws ErrorMessage
     {
-        // STUB
-        if (callNumber.equals("BAD")) throw new ErrorMessage("Error message test renewBook");
-        System.out.println("Renew " + callNumber + " " + copyNumber);
-        Calendar calendar = Calendar.getInstance();
-        calendar.add(Calendar.DATE, 10);
-        // Days late should be calculated from the checkout record in the database -
-        // this uses the copyNumber to facilitate testing - a book with a copy number
-        // greater than 10 is considered late that many days.
-        int daysLate = (copyNumber > 10) ? copyNumber : 0;
+        int daysLate = 0;
+        try {
+                
+            #sql { select days(today) - days(date_due)
+                    into :daysLate
+                    from Checked_out
+                    where call_number = :callNumber
+                    and copy_number = :copyNumber
+                };
+            
+            int checkoutPeriod;
 
+            #sql { select checkout_period
+                    into :checkoutPeriod
+                    from Checked_out
+                    left join Borrower
+                    on Checked_out.borrower_id = Borrower.borrower_id
+                    left join Category
+                    on Borrower.category_name = Category.category_name
+                    where call_number = :callNumber
+                    and copy_number = :copyNumber
+                };                
 
-        return new Date(calendar.getTime().getTime());
+            #sql { update Checked_out
+                    set date_due = today + :checkoutPeriod days
+                    where call_number = :callNumber
+                    and copy_number = :copyNumber
+                };
+            
+            Date newDateDue;
+
+            #sql { select date_due
+                    into :newDateDue
+                    from Checked_out
+                    where call_number = :callNumber
+                    and copy_number = :copyNumber
+            };
+            
+            #sql { commit };
+
+            return  newDateDue;
+        }
+        catch(SQLException e) {
+            rollback();
+            if (e.getSQLState().equals(CANT_RENEW_OVERDUE)) {
+                throw new ErrorMessage("Book is overdue " + daysLate +
+                " days and cannot be renewed");
+            }
+            else
+                throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
     }
 
     /* ************************************************************************
@@ -1130,9 +1205,22 @@ public class Database
      */
     public void payFine(String borrowerID, Fine fine) throws ErrorMessage
     {
-// STUB
-System.out.println("payFine() " + borrowerID + " " + fine.getAmountDue() + " called");
+        try {
+            String title = fine.getValues()[0];
+            Date dateDue = fine.getDateDue();
+            #sql { delete from Fine
+                    where borrower_id = :borrowerID
+                    and title = :title
+                    and date_due = :dateDue
+                };
+            
+            #sql { commit };
+        }
+        catch(SQLException e) {
+            throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
     }
+
 
     /* ************************************************************************
      * Methods called to produce various kinds of report
@@ -1208,16 +1296,45 @@ System.out.println("payFine() " + borrowerID + " " + fine.getAmountDue() + " cal
      *  @exception an ErrorMessage is thrown if there is an unexpected error
      *             accessing the database.
      */
+    #sql iterator BookCopiesReportCursor(int, String, int, String);
+
     public void bookCopiesReport(PrintStream stream) throws ErrorMessage
     {
-// STUB
-            String [] BOOKS_COPIES_REPORT_HEADINGS = 
-                { "Bar Code", "Call Number", "Copy #", "Title" };
-            int [] BOOKS_COPIES_REPORT_COLUMN_WIDTHS =
-                { 13, 22, 8, 50 };
-            boolean [] BOOKS_COPIES_REPORT_REPEAT_COLUMNS =
-                { false, false, false, false };
-stream.println("Book Copies report");        
+        try {
+                BookCopiesReportCursor cursor;
+
+                #sql cursor = { select bar_code,
+                                    Book.call_number,
+                                    copy_number,
+                                    title
+                                from Book left join Book_info
+                                on Book.call_number = Book_info.call_number
+                                order by bar_code
+                };
+
+                String [] BOOKS_COPIES_REPORT_HEADINGS = 
+                    { "Bar Code", "Call Number", "Copy #", "Title" };
+                int [] BOOKS_COPIES_REPORT_COLUMN_WIDTHS =
+                    { 13, 22, 8, 50 };
+                boolean [] BOOKS_COPIES_REPORT_REPEAT_COLUMNS =
+                    { false, false, false, false };
+
+                produceReport(stream,
+                    "Book Copies Report",
+                    BOOKS_COPIES_REPORT_HEADINGS,
+                    BOOKS_COPIES_REPORT_COLUMN_WIDTHS,
+                    BOOKS_COPIES_REPORT_REPEAT_COLUMNS,
+                    cursor.getResultSet());
+                cursor.close();
+            }
+            catch(SQLException e)
+            {
+                throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+            }
+            finally
+            {
+                rollback();
+            }
     }
 
     /** Produce a keywords report - keywords listed in alphabetical order,
@@ -1228,16 +1345,44 @@ stream.println("Book Copies report");
      *  @exception an ErrorMessage is thrown if there is an unexpected error
      *             accessing the database.
      */
+     #sql iterator KeywordsReportCursor(String, String, String);
+
     public void keywordsReport(PrintStream stream) throws ErrorMessage
     {
-// STUB
+        try {
+            KeywordsReportCursor cursor;
+
+            #sql cursor = { select keyword,
+                                Book_keyword.call_number,
+                                title
+                            from Book_keyword left join Book_info
+                            on Book_keyword.call_number = Book_info.call_number
+                            order by keyword, Book_keyword.call_number
+            };
+
             String [] BOOKS_KEYWORD_REPORT_HEADINGS = 
                 { "Keyword", "Call Number", "Title" };
             int [] BOOKS_KEYWORD_REPORT_COLUMN_WIDTHS =
                 { 22, 22, 50 };
             boolean [] BOOKS_KEYWORD_REPORT_REPEAT_COLUMNS =
                 { false, false, false };
-stream.println("Book Keywords report");            
+
+            produceReport(stream,
+                "Book Keywords Report",
+                BOOKS_KEYWORD_REPORT_HEADINGS,
+                BOOKS_KEYWORD_REPORT_COLUMN_WIDTHS,
+                BOOKS_KEYWORD_REPORT_REPEAT_COLUMNS,
+                cursor.getResultSet());
+            cursor.close();
+        }
+        catch(SQLException e)
+        {
+            throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
+        finally
+        {
+            rollback();
+        }   
     }
 
     /** Produce a list of all categories - name, max books out, checkout period
@@ -1340,16 +1485,47 @@ stream.println("Book Keywords report");
      *  @exception an ErrorMessage is thrown if there is an unexpected error
      *             accessing the database.
      */
+    #sql iterator FineReportCursor(String, String, String, double);
+
     public void finesReport(PrintStream stream) throws ErrorMessage
     {
-// STUB
+        try {
+            FineReportCursor cursor;
+
+            #sql cursor = { select last_name,
+                                first_name,
+                                phone,
+                                sum(amount) as total
+                            from Fine left join Borrower
+                            on Fine.borrower_id = Borrower.borrower_id
+                            left join Borrower_phone
+                            on Borrower.borrower_id = Borrower_phone.borrower_id
+                            group by last_name, first_name, phone
+                            order by total desc
+                        };
+
             String [] FINES_REPORT_HEADINGS = 
                 { "Last Name", "First Name", "Phone #", "Total Fines" };
             int [] FINES_REPORT_COLUMN_WIDTHS =
                 { 22, 22, 22, 11 };
             boolean [] FINES_REPORT_REPEAT_COLUMNS =
                 { true, true, false, true };
-stream.println("Fines report");         
+
+            produceReport(stream,
+                "Fines Report",
+                FINES_REPORT_HEADINGS,
+                FINES_REPORT_COLUMN_WIDTHS,
+                FINES_REPORT_REPEAT_COLUMNS,
+                cursor.getResultSet());
+
+            cursor.close();
+        }
+        catch (SQLException e) {
+            throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
+        finally {
+            rollback();
+        }   
     }
 
     /** Produce a list of all overdue books - borrower name,
@@ -1360,16 +1536,51 @@ stream.println("Fines report");
      *  @exception an ErrorMessage is thrown if there is an unexpected error
      *             accessing the database.
      */
+    #sql iterator OverdueBookReportCursor(String, String, String, Date);
+
     public void overdueBooksReport(PrintStream stream) throws ErrorMessage
     {
-// STUB
+        try {
+            OverdueBookReportCursor cursor;
+
+            #sql cursor = { select last_name,
+                                first_name,
+                                title,
+                                date_due
+                            from Checked_out
+                            left join Book
+                            on Checked_out.call_number = Book.call_number
+                            and Checked_out.copy_number = Book.copy_number
+                            left join Book_info
+                            on Book.call_number = Book_info.call_number
+                            left join Borrower
+                            on Checked_out.borrower_id = Borrower.borrower_id
+                            where date_due < today
+                            order by last_name, first_name, date_due
+                        };
+
             String [] OVERDUE_BOOKS_REPORT_HEADINGS = 
                 { "Last Name", "First Name", "Title", "Date Due" };
             int [] OVERDUE_BOOKS_REPORT_COLUMN_WIDTHS =
                 { 22, 22, 52, 10 };
             boolean [] OVERDUE_BOOKS_REPORT_REPEAT_COLUMNS =
-                { true, true, false, false };            
-stream.println("Overdue Books report");
+                { true, true, false, false };    
+            
+            produceReport(stream,
+                "Overdue Books Report",
+                OVERDUE_BOOKS_REPORT_HEADINGS,
+                OVERDUE_BOOKS_REPORT_COLUMN_WIDTHS,
+                OVERDUE_BOOKS_REPORT_REPEAT_COLUMNS,
+                cursor.getResultSet());
+
+            cursor.close();
+        }
+        catch (SQLException e) {
+            throw new ErrorMessage("Unexpected SQL error " + e.getMessage());
+        }
+        finally {
+            rollback();
+        }
     }
 
     /* ************************************************************************
@@ -1563,18 +1774,22 @@ stream.println("Overdue Books report");
     private static final int BAD_PASSWORD_SQL_ERROR = -1403;
     private static final String NO_ROW_SQL_STATE = "02000";
     private static final int DUPLICATE_KEY_SQL_ERROR = -803;
-    
+    private static final int INVALID_FOREIGN_KEY_ERROR = -530;
+
     // SQL states thrown by triggers
     private static final String CANT_RENEW_OVERDUE = "70000";
     private static final String CANT_DELETE_BORROWER_WITH_BOOK_CHECKED_OUT = "70001";
     private static final String REACHED_MAX_BOOK_CHECKED_OUT_LIMIT = "70002";
 
     // Symbolic names for constraints
-    
     private static final String BOOK_INFO_VALID_FORMAT_CONSTRAINT = 
         "CHK_FORMAT";
     private static final String BOOK_KEYWORD_VALID_KEYWORD_CONSTRAINT = 
         "CHK_KEYWORD";
+        private static final String CATEGORY_MAX_BOOKS_OUT_CONSTRAINT = 
+        "CHK_MAX_BOOKS_OUT";
+
+    // FK constraints
     private static final String BORROWER_CATEGORY_FOREIGN_CONSTRAINT =
         "FK_CATEGORY_NAME";
     
